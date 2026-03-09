@@ -1,4 +1,4 @@
--- cimarrao.lua — Tema Neovim escuro baseado no tema Omarchy Cimarrão
+-- yerba-mate.lua — Tema Neovim escuro baseado no tema Omarchy Cimarrão
 -- Filosofia: Carbon-Boo-Selenized · Mate-Industrial
 
 vim.cmd("highlight clear")
@@ -7,7 +7,7 @@ if vim.fn.exists("syntax_on") == 1 then
 end
 
 vim.o.background = "dark"
-vim.g.colors_name = "cimarrao"
+vim.g.colors_name = "yerba-mate"
 
 local c = {
   bg      = "#1c1e13",

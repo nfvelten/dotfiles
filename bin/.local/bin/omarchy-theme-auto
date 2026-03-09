@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# omarchy-theme-auto — troca o tema do Omarchy baseado no horário
+# Mesmo critério do site: 6h–18h → tererê (light), 18h–6h → yerba-mate (dark)
+
+LIGHT_THEME="terere"
+DARK_THEME="yerba-mate"
+CURRENT_THEME=$(cat "$HOME/.config/omarchy/current/theme.name" 2>/dev/null)
+HOUR=$(date +%-H)
+
+if (( HOUR >= 6 && HOUR < 18 )); then
+  TARGET="$LIGHT_THEME"
+else
+  TARGET="$DARK_THEME"
+fi
+
+# Só troca se necessário
+if [[ "$CURRENT_THEME" != "$TARGET" ]]; then
+  omarchy-theme-set "$TARGET"
+fi

@@ -12,13 +12,16 @@
 #   nvim            → ~/.config/nvim/
 #   omarchy-themes  → ~/.config/omarchy/themes/
 #   omarchy-hooks   → ~/.config/omarchy/hooks/
+#   hypr            → ~/.config/hypr/ (bindings + windowrules)
+#   bin             → ~/.local/bin/ (daily-note, omarchy-theme-auto)
+#   systemd         → ~/.config/systemd/user/ (timer troca automática de tema)
 #   obsidian        → instala tema no vault (requer OBSIDIAN_VAULT)
 # ══════════════════════════════════════════════════════════════════
 
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STOW_MODULES=(nvim omarchy-themes omarchy-hooks)
+STOW_MODULES=(nvim omarchy-themes omarchy-hooks hypr bin systemd)
 OBSIDIAN_MODULE="obsidian"
 
 # ── Verificar dependências ────────────────────────────────────────
@@ -70,6 +73,12 @@ if [[ $# -eq 0 ]]; then
     stow_module "$module"
   done
   install_obsidian
+  # Ativa o timer de troca automática de tema
+  if command -v systemctl &>/dev/null; then
+    systemctl --user daemon-reload
+    systemctl --user enable --now omarchy-theme-auto.timer 2>/dev/null && \
+      echo "  ✓ timer omarchy-theme-auto ativado"
+  fi
 else
   for arg in "$@"; do
     if [[ "$arg" == "obsidian" ]]; then
