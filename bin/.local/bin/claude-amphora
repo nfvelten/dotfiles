@@ -9,7 +9,7 @@ print('yes' if any(w.get('name') == 'special:claude-amphora' for w in ws) else '
 
 # Se a janela nao existe, cria e aguarda ela aparecer no scratchpad
 if ! hyprctl clients -j | grep -q '"class": "claude-amphora"'; then
-  alacritty --class claude-amphora --working-directory "$HOME/amphora" -e claude &
+  alacritty --class claude-amphora -e bash -c "cd $HOME/amphora && exec claude" &
   for _ in $(seq 1 20); do
     sleep 0.1
     hyprctl clients -j | grep -q '"class": "claude-amphora"' && break
