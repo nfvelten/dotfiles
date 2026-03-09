@@ -12,8 +12,8 @@ Temas baseados na paleta **Cimarrão** (dark) e **Tererê** (light).
 | `nvim` | `~/.config/nvim/` | Config completa do Neovim (LazyVim + plugins + temas) |
 | `omarchy-themes` | `~/.config/omarchy/themes/` | Temas Yerba Mate (dark) e Tererê (light) para o Omarchy |
 | `omarchy-hooks` | `~/.config/omarchy/hooks/` | Hook que sincroniza tema do Claude Code com o Omarchy |
-| `hypr` | `~/.config/hypr/` | Keybindings Hyprland — Super+N (daily note) e windowrules |
-| `bin` | `~/.local/bin/` | Scripts: `daily-note` (scratchpad nvim) e `omarchy-theme-auto` |
+| `hypr` | `~/.config/hypr/` | Keybindings Hyprland — Super+N (daily note), Super+C (Claude Code) e windowrules |
+| `bin` | `~/.local/bin/` | Scripts: `daily-note` (scratchpad nvim), `claude-amphora` (scratchpad Claude Code) e `omarchy-theme-auto` |
 | `systemd` | `~/.config/systemd/user/` | Timer que troca o tema automaticamente às 6h e 18h |
 | `obsidian` | vault `/.obsidian/themes/Omarchy/` | Tema Obsidian com dark/light separados |
 
