@@ -1,0 +1,65 @@
+# Tererê — Butter Paper btop theme
+
+theme[main_bg]="#fbf1c7"
+theme[main_fg]="#3c3836"
+theme[title]="#3c3836"
+theme[hi_fg]="#b57614"
+theme[selected_bg]="#ebdfb0"
+theme[selected_fg]="#3c3836"
+theme[inactive_fg]="#928374"
+theme[graph_text]="#3c3836"
+theme[meter_bg]="#ebdfb0"
+theme[proc_misc]="#b57614"
+
+# Box outlines — semântica Material/Carbon
+theme[cpu_box]="#b57614"
+theme[mem_box]="#79740e"
+theme[net_box]="#076678"
+theme[proc_box]="#8f3f71"
+
+theme[div_line]="#928374"
+
+# Temperature: verde → âmbar → terracota
+theme[temp_start]="#79740e"
+theme[temp_mid]="#b57614"
+theme[temp_end]="#9d0006"
+
+# CPU graph: azul petróleo → âmbar
+theme[cpu_start]="#076678"
+theme[cpu_mid]="#c88010"
+theme[cpu_end]="#b57614"
+
+# Mem/Disk free: azul → teal
+theme[free_start]="#076678"
+theme[free_mid]="#0c7a8c"
+theme[free_end]="#427b58"
+
+# Mem/Disk cached: verde oliva → teal
+theme[cached_start]="#79740e"
+theme[cached_mid]="#427b58"
+theme[cached_end]="#4f8f68"
+
+# Mem/Disk available: âmbar → terracota
+theme[available_start]="#b57614"
+theme[available_mid]="#af1010"
+theme[available_end]="#9d0006"
+
+# Mem/Disk used: verde oliva → teal
+theme[used_start]="#79740e"
+theme[used_mid]="#427b58"
+theme[used_end]="#4f8f68"
+
+# Download: terracota
+theme[download_start]="#af1010"
+theme[download_mid]="#9d0006"
+theme[download_end]="#8f3f71"
+
+# Upload: verde oliva
+theme[upload_start]="#8c8c08"
+theme[upload_mid]="#79740e"
+theme[upload_end]="#427b58"
+
+# Process: azul → rose
+theme[process_start]="#076678"
+theme[process_mid]="#0c7a8c"
+theme[process_end]="#8f3f71"

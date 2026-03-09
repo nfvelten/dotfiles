@@ -1,0 +1,50 @@
+# Tererê — Butter Paper (light)
+# Filosofia: Carbon-Boo-Selenized · Mate-Industrial
+#
+# bg:       #fbf1c7  Creme Amanteigado
+# fg:       #3c3836  Cinza Carvão Escuro
+# accent:   #b57614  Âmbar Dourado
+# keywords: #9d0006  Vermelho Terracota
+# functions:#076678  Azul Petróleo
+# strings:  #79740e  Verde Oliva Denso
+# comments: #928374  Cinza Taupe
+
+accent = "#b57614"
+cursor = "#b57614"
+foreground = "#3c3836"
+background = "#fbf1c7"
+selection_foreground = "#fbf1c7"
+selection_background = "#3c3836"
+
+# 0  shadow surface — creme mais escuro, não cinza frio
+color0 = "#ebdfb0"
+# 1  red — vermelho terracota, keywords
+color1 = "#9d0006"
+# 2  green — verde oliva denso, strings
+color2 = "#79740e"
+# 3  yellow — âmbar dourado, acento
+color3 = "#b57614"
+# 4  blue — azul petróleo, functions
+color4 = "#076678"
+# 5  magenta — rose terroso, tipos
+color5 = "#8f3f71"
+# 6  cyan — teal floresta, anotações
+color6 = "#427b58"
+# 7  white — oliva médio, legível no creme e coerente com a paleta
+color7 = "#5a6848"
+# 8  bright black — cinza taupe, comments
+color8 = "#928374"
+# 9  bright red
+color9 = "#af1010"
+# 10 bright green
+color10 = "#8c8c08"
+# 11 bright yellow
+color11 = "#c88010"
+# 12 bright blue
+color12 = "#0c7a8c"
+# 13 bright magenta
+color13 = "#9d4f7d"
+# 14 bright cyan
+color14 = "#4f8f68"
+# 15 bright white — quase preto quente, NÃO azulado
+color15 = "#1c1816"

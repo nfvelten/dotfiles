@@ -1,0 +1,9 @@
+# Stow backup files
+*.~*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backgrounds (imagens pesadas, não versionadas)
+omarchy-themes/.config/omarchy/themes/*/backgrounds/

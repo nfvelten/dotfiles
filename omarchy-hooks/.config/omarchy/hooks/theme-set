@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Sincroniza o tema do Claude Code com o tema do Omarchy
+# light.mode existe → tema claro, senão → tema escuro
+
+CLAUDE_JSON="$HOME/.claude.json"
+LIGHT_MODE="$HOME/.config/omarchy/current/theme/light.mode"
+
+if [[ ! -f "$CLAUDE_JSON" ]]; then
+  exit 0
+fi
+
+if [[ -f "$LIGHT_MODE" ]]; then
+  claude_theme="light"
+else
+  claude_theme="dark"
+fi
+
+tmp=$(mktemp)
+jq --arg t "$claude_theme" '.theme = $t' "$CLAUDE_JSON" > "$tmp" && mv "$tmp" "$CLAUDE_JSON"
+
+# Notifica para reiniciar Claude Code se estiver rodando
+if pgrep -x claude >/dev/null; then
+  notify-send "Claude Code" "Tema alterado para $claude_theme — reinicie para aplicar" --icon=dialog-information -t 4000
+fi
