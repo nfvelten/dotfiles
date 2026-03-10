@@ -6,7 +6,19 @@ daily="$HOME/amphora/Daily Notes/$(date +%Y)/${months[$(date +%-m)]}/$today.md"
 # Cria a daily note com template se nao existir
 if [ ! -f "$daily" ]; then
   mkdir -p "$(dirname "$daily")"
-  weekday=$(LC_TIME=pt_BR.UTF-8 date +%A)
+  weekday=$(LC_TIME=pt_BR.UTF-8 date +%A 2>/dev/null)
+  # fallback se o locale nao estiver instalado
+  if [[ "$weekday" =~ ^[A-Z] ]]; then
+    case "$weekday" in
+      Monday)    weekday="segunda-feira" ;;
+      Tuesday)   weekday="terça-feira" ;;
+      Wednesday) weekday="quarta-feira" ;;
+      Thursday)  weekday="quinta-feira" ;;
+      Friday)    weekday="sexta-feira" ;;
+      Saturday)  weekday="sábado" ;;
+      Sunday)    weekday="domingo" ;;
+    esac
+  fi
   {
     printf -- "---\n"
     printf "id: \"%s\"\n" "$today"
@@ -24,6 +36,13 @@ if [ ! -f "$daily" ]; then
     printf "### Notas Rápidas sobre as Tarefas / Resultados do Dia\n\n*\n\n"
     printf "### Highlight do Dia\n\n*\n\n"
     printf "### 📝 Log de Notas\n\n"
+    printf "| Hora | Nota | Contexto |\n"
+    printf "|------|------|----------|\n\n"
+    printf "### Tarefas incompletas\n"
+    printf '```tasks\n'
+    printf "not done\n"
+    printf "path includes Daily Notes/%s.md\n" "$today"
+    printf '```\n'
   } > "$daily"
 fi
 
