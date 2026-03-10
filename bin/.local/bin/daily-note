@@ -66,13 +66,6 @@ for c in json.load(sys.stdin):
   fi
 fi
 
-# Verifica se o scratchpad esta visivel agora (antes do toggle)
-visible=$(hyprctl monitors -j | python3 -c "
-import json, sys
-monitors = json.load(sys.stdin)
-print('yes' if any(m.get('specialWorkspace', {}).get('name') == 'special:daily-note' for m in monitors) else 'no')
-" 2>/dev/null)
-
 # Se a janela nao existe, cria e aguarda ela aparecer no scratchpad
 if ! hyprctl clients -j | grep -q '"class": "daily-note"'; then
   alacritty --class daily-note -e nvim "$daily" &
@@ -85,8 +78,15 @@ fi
 # Toggle: mostra ou esconde o scratchpad
 hyprctl dispatch togglespecialworkspace daily-note
 
-# Foca a janela somente ao mostrar (nao ao esconder)
-if [ "$visible" = "no" ]; then
-  sleep 0.05
+# Verifica APOS o toggle se o scratchpad ficou visivel
+# Se sim: foca. Se nao (foi escondido): nao faz nada.
+sleep 0.05
+now_visible=$(hyprctl monitors -j | python3 -c "
+import json, sys
+monitors = json.load(sys.stdin)
+print('yes' if any(m.get('specialWorkspace', {}).get('name') == 'special:daily-note' for m in monitors) else 'no')
+" 2>/dev/null)
+
+if [ "$now_visible" = "yes" ]; then
   hyprctl dispatch focuswindow class:daily-note
 fi
