@@ -48,10 +48,10 @@ for c in json.load(sys.stdin):
 fi
 
 # Verifica se o scratchpad esta visivel agora (antes do toggle)
-visible=$(hyprctl workspaces -j | python3 -c "
+visible=$(hyprctl monitors -j | python3 -c "
 import json, sys
-ws = json.load(sys.stdin)
-print('yes' if any(w.get('name') == 'special:daily-note' for w in ws) else 'no')
+monitors = json.load(sys.stdin)
+print('yes' if any(m.get('specialWorkspace', {}).get('name') == 'special:daily-note' for m in monitors) else 'no')
 " 2>/dev/null)
 
 # Se a janela nao existe, cria e aguarda ela aparecer no scratchpad
