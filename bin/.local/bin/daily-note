@@ -2,6 +2,7 @@
 months=("" "Janeiro" "Fevereiro" "Março" "Abril" "Maio" "Junho" "Julho" "Agosto" "Setembro" "Outubro" "Novembro" "Dezembro")
 today=$(date +%d-%m-%Y)
 daily="$HOME/amphora/Daily Notes/$(date +%Y)/${months[$(date +%-m)]}/$today.md"
+LOCK="/tmp/daily-note-visible"
 
 # Cria a daily note com template se nao existir
 if [ ! -f "$daily" ]; then
@@ -62,31 +63,31 @@ for c in json.load(sys.stdin):
     if c.get('class') == 'daily-note':
         print(c['pid'])
 " 2>/dev/null | xargs -r kill
+    rm -f "$LOCK"
     sleep 0.2
   fi
 fi
 
-# Se a janela nao existe, cria e aguarda ela aparecer no scratchpad
+# Se a janela nao existe (fechada manualmente), limpa o lock
 if ! hyprctl clients -j | grep -q '"class": "daily-note"'; then
-  alacritty --class daily-note -e nvim "$daily" &
-  for _ in $(seq 1 20); do
-    sleep 0.1
-    hyprctl clients -j | grep -q '"class": "daily-note"' && break
-  done
+  rm -f "$LOCK"
 fi
 
-# Toggle: mostra ou esconde o scratchpad
-hyprctl dispatch togglespecialworkspace daily-note
-
-# Verifica APOS o toggle se o scratchpad ficou visivel
-# Se sim: foca. Se nao (foi escondido): nao faz nada.
-sleep 0.05
-now_visible=$(hyprctl monitors -j | python3 -c "
-import json, sys
-monitors = json.load(sys.stdin)
-print('yes' if any(m.get('specialWorkspace', {}).get('name') == 'special:daily-note' for m in monitors) else 'no')
-" 2>/dev/null)
-
-if [ "$now_visible" = "yes" ]; then
+if [ -f "$LOCK" ]; then
+  # Marcado como visivel: esconde
+  hyprctl dispatch togglespecialworkspace daily-note
+  rm -f "$LOCK"
+else
+  # Oculto ou inexistente: abre e foca
+  if ! hyprctl clients -j | grep -q '"class": "daily-note"'; then
+    alacritty --class daily-note -e nvim "$daily" &
+    for _ in $(seq 1 20); do
+      sleep 0.1
+      hyprctl clients -j | grep -q '"class": "daily-note"' && break
+    done
+  fi
+  hyprctl dispatch togglespecialworkspace daily-note
+  sleep 0.05
   hyprctl dispatch focuswindow class:daily-note
+  touch "$LOCK"
 fi
