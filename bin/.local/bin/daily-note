@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 months=("" "Janeiro" "Fevereiro" "Março" "Abril" "Maio" "Junho" "Julho" "Agosto" "Setembro" "Outubro" "Novembro" "Dezembro")
-daily="$HOME/amphora/Daily Notes/$(date +%Y)/${months[$(date +%-m)]}/$(date +%d-%m-%Y).md"
+today=$(date +%d-%m-%Y)
+daily="$HOME/amphora/Daily Notes/$(date +%Y)/${months[$(date +%-m)]}/$today.md"
 
 # Cria a daily note com template se nao existir
 if [ ! -f "$daily" ]; then
   mkdir -p "$(dirname "$daily")"
-  title=$(date +%d-%m-%Y)
   weekday=$(LC_TIME=pt_BR.UTF-8 date +%A)
   {
     printf -- "---\n"
-    printf "id: \"%s\"\n" "$title"
+    printf "id: \"%s\"\n" "$today"
     printf "aliases: []\n"
     printf "tags:\n  - daily_notes\nenergia: \nmood: \n"
     printf -- "---\n"
-    printf "## Tarefas do Dia - %s (%s)\n\n" "$title" "$weekday"
+    printf "## Tarefas do Dia - %s (%s)\n\n" "$today" "$weekday"
     printf "### Foco Principal do Dia\n\n*\n\n---\n\n"
     printf "### Lista de Tarefas: #pessoal\n\n"
     printf "* [ ] Ir a academia\n"
@@ -25,6 +25,26 @@ if [ ! -f "$daily" ]; then
     printf "### Highlight do Dia\n\n*\n\n"
     printf "### 📝 Log de Notas\n\n"
   } > "$daily"
+fi
+
+# Se a janela existe mas nao e de hoje, fecha para abrir a correta
+if hyprctl clients -j | grep -q '"class": "daily-note"'; then
+  window_title=$(hyprctl clients -j | python3 -c "
+import json, sys
+for c in json.load(sys.stdin):
+    if c.get('class') == 'daily-note':
+        print(c.get('title', ''))
+        break
+" 2>/dev/null)
+  if [[ "$window_title" != *"$today"* ]]; then
+    hyprctl clients -j | python3 -c "
+import json, sys
+for c in json.load(sys.stdin):
+    if c.get('class') == 'daily-note':
+        print(c['pid'])
+" 2>/dev/null | xargs -r kill
+    sleep 0.2
+  fi
 fi
 
 # Verifica se o scratchpad esta visivel agora (antes do toggle)
