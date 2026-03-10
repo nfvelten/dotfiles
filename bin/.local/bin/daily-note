@@ -7,7 +7,6 @@ daily="$HOME/amphora/Daily Notes/$(date +%Y)/${months[$(date +%-m)]}/$today.md"
 if [ ! -f "$daily" ]; then
   mkdir -p "$(dirname "$daily")"
   weekday=$(LC_TIME=pt_BR.UTF-8 date +%A 2>/dev/null)
-  # fallback se o locale nao estiver instalado
   if [[ "$weekday" =~ ^[A-Z] ]]; then
     case "$weekday" in
       Monday)    weekday="segunda-feira" ;;
@@ -46,27 +45,7 @@ if [ ! -f "$daily" ]; then
   } > "$daily"
 fi
 
-# Se a janela existe mas nao e de hoje, fecha para abrir a correta
-if hyprctl clients -j | grep -q '"class": "daily-note"'; then
-  window_title=$(hyprctl clients -j | python3 -c "
-import json, sys
-for c in json.load(sys.stdin):
-    if c.get('class') == 'daily-note':
-        print(c.get('title', ''))
-        break
-" 2>/dev/null)
-  if [[ "$window_title" != *"$today"* ]]; then
-    hyprctl clients -j | python3 -c "
-import json, sys
-for c in json.load(sys.stdin):
-    if c.get('class') == 'daily-note':
-        print(c['pid'])
-" 2>/dev/null | xargs -r kill
-    sleep 0.2
-  fi
-fi
-
-# Verifica se o scratchpad esta visivel (logica identica ao claude-amphora)
+# Verifica se o scratchpad esta visivel agora (antes do toggle)
 visible=$(hyprctl workspaces -j | python3 -c "
 import json, sys
 ws = json.load(sys.stdin)
@@ -85,7 +64,7 @@ fi
 # Toggle: mostra ou esconde o scratchpad
 hyprctl dispatch togglespecialworkspace daily-note
 
-# Foca somente na primeira abertura (quando janela ainda nao existia)
+# Foca a janela somente ao mostrar (nao ao esconder)
 if [ "$visible" = "no" ]; then
   sleep 0.05
   hyprctl dispatch focuswindow class:daily-note
