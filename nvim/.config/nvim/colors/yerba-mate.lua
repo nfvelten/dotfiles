@@ -1,5 +1,4 @@
--- yerba-mate.lua — Tema Neovim escuro baseado no tema Omarchy Cimarrão
--- Filosofia: Carbon-Boo-Selenized · Mate-Industrial
+-- yerba-mate.lua — Yerba Mate dark colorscheme for Neovim
 
 vim.cmd("highlight clear")
 if vim.fn.exists("syntax_on") == 1 then

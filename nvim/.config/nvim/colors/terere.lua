@@ -1,5 +1,4 @@
--- terere.lua — Tema Neovim claro baseado no tema Omarchy Tereré
--- Filosofia: Carbon-Boo-Selenized · Mate-Industrial · Manteiga de Papel
+-- terere.lua — Tererê light colorscheme for Neovim
 
 vim.cmd("highlight clear")
 if vim.fn.exists("syntax_on") == 1 then
