@@ -4,7 +4,7 @@
 # Padrão: cliffs
 
 WALLPAPER_SET="${1:-cliffs}"
-WALLPAPER_DIR="$HOME/Dynamic-Wallpapers-Linux/images/$WALLPAPER_SET"
+WALLPAPER_DIR="$HOME/.config/omarchy/backgrounds/$WALLPAPER_SET"
 HOUR=$(date +%-H)
 
 if [[ ! -d "$WALLPAPER_DIR" ]]; then

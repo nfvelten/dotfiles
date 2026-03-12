@@ -3,4 +3,6 @@ Description=Dynamic wallpaper based on time of day
 
 [Service]
 Type=oneshot
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 ExecStart=%h/.local/bin/dynamic-wallpaper cliffs
