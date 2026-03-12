@@ -1,0 +1,44 @@
+#!/bin/bash
+# dynamic-wallpaper — troca o wallpaper baseado na hora do dia
+# Uso: dynamic-wallpaper [wallpaper-set]
+# Padrão: cliffs
+
+WALLPAPER_SET="${1:-cliffs}"
+WALLPAPER_DIR="$HOME/Dynamic-Wallpapers-Linux/images/$WALLPAPER_SET"
+HOUR=$(date +%-H)
+
+if [[ ! -d "$WALLPAPER_DIR" ]]; then
+  echo "Wallpaper set '$WALLPAPER_SET' não encontrado em $WALLPAPER_DIR" >&2
+  exit 1
+fi
+
+# Encontra a imagem com hora <= hora atual (mais próxima)
+BEST=""
+BEST_HOUR=-1
+
+for f in "$WALLPAPER_DIR"/*.jpg "$WALLPAPER_DIR"/*.png; do
+  [[ -f "$f" ]] || continue
+  fname=$(basename "${f%.*}")
+  [[ "$fname" =~ ^[0-9]+$ ]] || continue
+  if (( fname <= HOUR && fname > BEST_HOUR )); then
+    BEST_HOUR=$fname
+    BEST="$f"
+  fi
+done
+
+# Fallback: se nenhuma imagem for <= hora atual, usa a última do dia anterior
+if [[ -z "$BEST" ]]; then
+  for f in "$WALLPAPER_DIR"/*.jpg "$WALLPAPER_DIR"/*.png; do
+    [[ -f "$f" ]] || continue
+    fname=$(basename "${f%.*}")
+    [[ "$fname" =~ ^[0-9]+$ ]] || continue
+    if (( fname > BEST_HOUR )); then
+      BEST_HOUR=$fname
+      BEST="$f"
+    fi
+  done
+fi
+
+if [[ -n "$BEST" ]]; then
+  omarchy-theme-bg-set "$BEST"
+fi
