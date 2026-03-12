@@ -40,5 +40,9 @@ if [[ -z "$BEST" ]]; then
 fi
 
 if [[ -n "$BEST" ]]; then
-  omarchy-theme-bg-set "$BEST"
+  ln -nsf "$BEST" "$HOME/.config/omarchy/current/background"
+  pkill -x swaybg 2>/dev/null || true
+  sleep 0.3
+  swaybg -i "$HOME/.config/omarchy/current/background" -m fill &
+  disown
 fi
