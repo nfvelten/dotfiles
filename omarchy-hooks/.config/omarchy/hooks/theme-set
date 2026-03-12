@@ -23,3 +23,20 @@ jq --arg t "$claude_theme" '.theme = $t' "$CLAUDE_JSON" > "$tmp" && mv "$tmp" "$
 if pgrep -x claude >/dev/null; then
   notify-send "Claude Code" "Tema alterado para $claude_theme — reinicie para aplicar" --icon=dialog-information -t 4000
 fi
+
+# Sincroniza o tema do Zen Browser
+ZEN_CHROME="$HOME/.zen/uttg05om.Default (release)/chrome/userChrome.css"
+
+if [[ -f "$ZEN_CHROME" ]]; then
+  if [[ -f "$LIGHT_MODE" ]]; then
+    cat > "$ZEN_CHROME" <<'EOF'
+/* Tererê — light */
+@import url("../../../../../../../home/nfvelten/code/zen-terere/chrome.css");
+EOF
+  else
+    cat > "$ZEN_CHROME" <<'EOF'
+/* Yerba Mate — dark */
+@import url("../../../../../../../home/nfvelten/code/zen-yerba-mate/chrome.css");
+EOF
+  fi
+fi
