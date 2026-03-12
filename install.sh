@@ -6,22 +6,25 @@
 # Uso:
 #   ./install.sh              — instala todos os módulos
 #   ./install.sh nvim         — instala só o nvim
-#   ./install.sh nvim omarchy-themes  — instala múltiplos
+#   ./install.sh nvim hypr    — instala múltiplos
 #
 # Módulos disponíveis:
 #   nvim            → ~/.config/nvim/
-#   omarchy-themes  → ~/.config/omarchy/themes/
 #   omarchy-hooks   → ~/.config/omarchy/hooks/
 #   hypr            → ~/.config/hypr/ (bindings + windowrules)
 #   bin             → ~/.local/bin/ (daily-note, omarchy-theme-auto)
 #   systemd         → ~/.config/systemd/user/ (timer troca automática de tema)
 #   obsidian        → instala tema no vault (requer OBSIDIAN_VAULT)
+#
+# Temas Omarchy são instalados diretamente dos repos públicos:
+#   github.com/nfvelten/omarchy-yerba-mate  → dark
+#   github.com/nfvelten/omarchy-terere      → light
 # ══════════════════════════════════════════════════════════════════
 
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STOW_MODULES=(nvim omarchy-themes omarchy-hooks hypr bin systemd)
+STOW_MODULES=(nvim omarchy-hooks hypr bin systemd)
 OBSIDIAN_MODULE="obsidian"
 
 # ── Verificar dependências ────────────────────────────────────────
@@ -45,6 +48,26 @@ stow_module() {
   echo "→ Instalando $module..."
   stow --dir="$DOTFILES_DIR" --target="$HOME" --restow "$module"
   echo "  ✓ $module"
+}
+
+# ── Instalar temas Omarchy dos repos públicos ────────────────────
+install_omarchy_themes() {
+  local themes_dir="$HOME/.config/omarchy/themes"
+  mkdir -p "$themes_dir"
+
+  for theme in yerba-mate terere; do
+    local repo="omarchy-${theme}"
+    local dest="$themes_dir/$theme"
+    if [[ -d "$dest/.git" ]]; then
+      echo "→ Atualizando $theme..."
+      git -C "$dest" pull --ff-only
+    else
+      echo "→ Instalando $theme..."
+      rm -rf "$dest"
+      git clone "https://github.com/nfvelten/$repo.git" "$dest"
+    fi
+    echo "  ✓ $theme"
+  done
 }
 
 # ── Instalar tema do Obsidian ─────────────────────────────────────
@@ -73,6 +96,7 @@ if [[ $# -eq 0 ]]; then
     stow_module "$module"
   done
   install_obsidian
+  install_omarchy_themes
   # Ativa o timer de troca automática de tema
   if command -v systemctl &>/dev/null; then
     systemctl --user daemon-reload
