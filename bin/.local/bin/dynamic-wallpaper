@@ -43,6 +43,6 @@ if [[ -n "$BEST" ]]; then
   ln -nsf "$BEST" "$HOME/.config/omarchy/current/background"
   pkill -x swaybg 2>/dev/null || true
   sleep 0.3
-  swaybg -i "$HOME/.config/omarchy/current/background" -m fill &
-  disown
+  systemd-run --user --scope --slice=app-graphical.slice --quiet --collect -- \
+    swaybg -i "$HOME/.config/omarchy/current/background" -m fill
 fi
