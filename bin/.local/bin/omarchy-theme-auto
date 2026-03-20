@@ -16,4 +16,12 @@ fi
 # Só troca se necessário
 if [[ "$CURRENT_THEME" != "$TARGET" ]]; then
   omarchy-theme-set "$TARGET"
+else
+  # Tema já correto — verifica se o wallpaper pertence ao tema atual
+  CURRENT_BG=$(readlink "$HOME/.config/omarchy/current/background" 2>/dev/null)
+  USER_BG_PATH="$HOME/.config/omarchy/backgrounds/$TARGET"
+  THEME_BG_PATH="$HOME/.config/omarchy/current/theme/backgrounds"
+  if [[ "$CURRENT_BG" != "$USER_BG_PATH/"* && "$CURRENT_BG" != "$THEME_BG_PATH/"* ]]; then
+    omarchy-theme-bg-next
+  fi
 fi
