@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# newsboat-save <url> <title>
+# Faz scraping do artigo, resume com claude e salva no vault
+
+URL="$1"
+TITLE="${2:-Artigo sem título}"
+VAULT="$HOME/amphora"
+DATE=$(date +%d-%m-%Y)
+MONTHS=("" "Janeiro" "Fevereiro" "Março" "Abril" "Maio" "Junho" "Julho" "Agosto" "Setembro" "Outubro" "Novembro" "Dezembro")
+DAILY="$VAULT/Daily Notes/$(date +%Y)/${MONTHS[$(date +%-m)]}/$DATE.md"
+
+notify-send -a "Newsboat" "📰 Salvando..." "$TITLE"
+
+# Extrai conteúdo limpo com rdrview
+CONTENT=$(rdrview -T title,body "$URL" 2>/dev/null)
+
+if [ -z "$CONTENT" ]; then
+  # Fallback: curl simples
+  CONTENT=$(curl -sL "$URL" | sed 's/<[^>]*>//g' | tr -s ' \n' | head -c 8000)
+fi
+
+if [ -z "$CONTENT" ]; then
+  notify-send -a "Newsboat" "❌ Erro" "Não foi possível extrair o conteúdo."
+  exit 1
+fi
+
+# Resumo com claude
+SUMMARY=$("$HOME/.local/bin/claude" -p "Você é um assistente de leitura. Resuma o artigo abaixo em português com: **Ideia principal**, **Pontos-chave** (3-5 bullets) e **Por que importa**. Seja conciso.
+
+$CONTENT" < /dev/null 2>/dev/null)
+
+# Nome do arquivo — limpa título para uso como nome
+SAFE_TITLE=$(echo "$TITLE" | tr -d '/:*?"<>|\\' | cut -c1-60)
+NOTE_FILE="$VAULT/Pessoal/Leituras/${SAFE_TITLE}.md"
+mkdir -p "$VAULT/Pessoal/Leituras"
+
+# Não duplica se já existe
+if [ -f "$NOTE_FILE" ]; then
+  notify-send -a "Newsboat" "⚠️ Já existe" "[[Leituras/$SAFE_TITLE]]"
+  exit 0
+fi
+
+cat > "$NOTE_FILE" <<NOTE
+---
+tags: [leitura, artigo]
+criado: $DATE
+url: $URL
+---
+# $TITLE
+
+## Resumo
+
+$SUMMARY
+
+---
+
+## Conteúdo original
+
+$CONTENT
+NOTE
+
+# Linka na daily note
+if [ -f "$DAILY" ]; then
+  if grep -q "^### Notas Rápidas" "$DAILY"; then
+    sed -i "/^### Notas Rápidas/a - 📰 [[Leituras/${SAFE_TITLE}]] — artigo salvo" "$DAILY"
+  fi
+fi
+
+notify-send -a "Newsboat" "✅ Salvo" "[[Leituras/$SAFE_TITLE]]" -t 6000

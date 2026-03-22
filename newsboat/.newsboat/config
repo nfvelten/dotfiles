@@ -1,0 +1,16 @@
+browser "rdrview -B w3m %u"
+
+# Salvar artigo no vault — ,s na lista de artigos
+macro s set browser "$HOME/.local/bin/newsboat-save %u \"%t\" &" ; open-in-browser ; set browser "rdrview -B w3m %u"
+
+# Salvar + abrir ao pressionar ,o
+macro o exec "$HOME/.local/bin/newsboat-save %u \"%t\" &" ; open-in-browser
+
+# Cores — Yerba Mate
+color background          default   default
+color listnormal          default   default
+color listnormal_unread   green     default   bold
+color listfocus           black     green
+color listfocus_unread    black     green     bold
+color info                black     green
+color title               black     green     bold
