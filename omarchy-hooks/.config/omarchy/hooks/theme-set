@@ -43,9 +43,11 @@ fi
 
 # Sincroniza o tema do LibreWolf
 LIBREWOLF_CHROME="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/chrome/userChrome.css"
+LIBREWOLF_CONTENT="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/chrome/userContent.css"
 LIBREWOLF_USERJS="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/user.js"
 
-LIBREWOLF_EXTRA_CSS='
+# CSS de comportamento (tridactyl auto-hide, sem cor — vale para ambos os temas)
+LIBREWOLF_BEHAVIOR='
 statuspanel[type="overLink"],
 #statuspanel[type="overLink"] {
   display: none !important;
@@ -53,7 +55,7 @@ statuspanel[type="overLink"],
 
 :root:not([customizing]) #navigator-toolbox:not(:hover):not(:focus-within) #nav-bar {
   max-height: 0;
-  min-height: 0!important;
+  min-height: 0 !important;
   --tridactyl-auto-show-zone: 10px;
   margin-bottom: calc(-1 * var(--tridactyl-auto-show-zone));
   opacity: 0;
@@ -73,10 +75,6 @@ statuspanel[type="overLink"],
   --urlbar-container-height: auto !important;
 }
 
-#navigator-toolbox:not(:hover):not(:focus-within) #toolbar-menubar > * {
-  background-color: rgb(232, 232, 231);
-}
-
 #main-window[sizemode="maximized"] #content-deck {
   padding-top: 8px;
 }
@@ -87,24 +85,238 @@ statuspanel[type="overLink"],
 
 :root:not([customizing]) #navigator-toolbox:not(:hover):not(:focus-within) {
   max-height: 1px;
-  min-height: calc(0px);
+  min-height: 0;
   overflow: hidden;
 }
 '
 
 if [[ -f "$LIBREWOLF_CHROME" ]]; then
   if [[ -f "$LIGHT_MODE" ]]; then
-    printf '/* Tererê — light */\n@import url("/home/nfvelten/code/zen-terere/chrome.css");\n%s' "$LIBREWOLF_EXTRA_CSS" > "$LIBREWOLF_CHROME"
+    # Tererê — cores diretas nos elementos (sem depender de variáveis Zen)
+    cat > "$LIBREWOLF_CHROME" <<'LWCSS'
+/* Tererê — LibreWolf */
+
+:root, #main-window {
+  color-scheme: light !important;
+}
+
+:root {
+  --toolbar-bgcolor: #fbf1c7 !important;
+  --toolbar-color: #3c3836 !important;
+  --lwt-text-color: #3c3836 !important;
+  --lwt-tab-text: #3c3836 !important;
+  --tabpanel-background-color: #fbf1c7 !important;
+  --arrowpanel-background: #ebdfb0 !important;
+  --arrowpanel-border-color: #928374 !important;
+  --tab-selected-bgcolor: #ebdfb0 !important;
+  --toolbar-field-background-color: #ebdfb0 !important;
+  --toolbar-field-color: #3c3836 !important;
+  --toolbar-field-border-color: #928374 !important;
+  --toolbar-field-focus-background-color: #ebdfb0 !important;
+  --toolbar-field-focus-color: #3c3836 !important;
+  --toolbar-field-focus-border-color: #b57614 !important;
+  --sidebar-background-color: #fbf1c7 !important;
+  --sidebar-text-color: #3c3836 !important;
+  --lwt-sidebar-background-color: #fbf1c7 !important;
+  --lwt-sidebar-text-color: #3c3836 !important;
+  --lwt-toolbar-field-highlight: #b57614 !important;
+  --lwt-toolbar-field-highlight-text: #fbf1c7 !important;
+  --lwt-accent-color: #fbf1c7 !important;
+}
+
+#main-window,
+#navigator-toolbox,
+#nav-bar,
+#TabsToolbar,
+#toolbar-menubar,
+#PersonalToolbar {
+  background-color: #fbf1c7 !important;
+  color: #3c3836 !important;
+}
+
+#navigator-toolbox:not(:hover):not(:focus-within) #toolbar-menubar > * {
+  background-color: #fbf1c7 !important;
+}
+
+.tabbrowser-tab[selected] .tab-background { background-color: #ebdfb0 !important; }
+.tab-label, .tab-text { color: #3c3836 !important; }
+
+#urlbar, #urlbar-background, #urlbar-input-container, .urlbar-input-box {
+  background-color: #ebdfb0 !important;
+  color: #3c3836 !important;
+  border-color: #928374 !important;
+  outline: none !important;
+}
+
+#urlbar[focused] > #urlbar-background {
+  border-color: #b57614 !important;
+  box-shadow: none !important;
+}
+
+.urlbarView, .urlbarView-body-inner, .urlbarView-results {
+  background-color: #ebdfb0 !important;
+  color: #3c3836 !important;
+}
+
+.urlbarView-row:hover, .urlbarView-row[selected] { background-color: #d5c4a1 !important; }
+.urlbarView-title, .urlbarView-secondary, .urlbarView-action { color: #3c3836 !important; }
+.urlbarView-url { color: #076678 !important; }
+
+#appMenu-popup,
+menupopup,
+.panel-arrowcontent,
+.autocomplete-richlistbox-popup {
+  background-color: #ebdfb0 !important;
+  color: #3c3836 !important;
+  border-color: #928374 !important;
+}
+
+menuitem:hover, menuitem[_moz-menuactive="true"] {
+  background-color: #d5c4a1 !important;
+}
+
+#FindToolbar {
+  background-color: #fbf1c7 !important;
+  color: #3c3836 !important;
+}
+LWCSS
+    printf '%s' "$LIBREWOLF_BEHAVIOR" >> "$LIBREWOLF_CHROME"
+
+    # userContent — fundo amarelado em páginas sem background definido
+    cat > "$LIBREWOLF_CONTENT" <<'UCCSS'
+/* Tererê — fundo warm em páginas sem background explícito */
+@-moz-document url("about:blank"),
+               url("about:newtab"),
+               url("about:home") {
+  html, body { background-color: #fbf1c7 !important; color: #3c3836 !important; }
+}
+
+@-moz-document url-prefix("http://"),
+               url-prefix("https://") {
+  /* Sem !important: sites com background próprio não são afetados */
+  :root, html { background-color: #fbf1c7; }
+}
+UCCSS
+
     dark_val=0
+    cs_val=1   # prefers-color-scheme: light
+
   else
-    printf '/* Yerba Mate — dark */\n@import url("/home/nfvelten/code/zen-yerba-mate/chrome.css");\n%s' "$LIBREWOLF_EXTRA_CSS" > "$LIBREWOLF_CHROME"
+    # Yerba Mate
+    cat > "$LIBREWOLF_CHROME" <<'LWCSS'
+/* Yerba Mate — LibreWolf */
+
+:root, #main-window {
+  color-scheme: dark !important;
+}
+
+:root {
+  --toolbar-bgcolor: #1c1e13 !important;
+  --toolbar-color: #dce0d9 !important;
+  --lwt-text-color: #dce0d9 !important;
+  --lwt-tab-text: #dce0d9 !important;
+  --tabpanel-background-color: #1c1e13 !important;
+  --arrowpanel-background: #282d1c !important;
+  --arrowpanel-border-color: #4f5b4a !important;
+  --tab-selected-bgcolor: #282d1c !important;
+  --toolbar-field-background-color: #282d1c !important;
+  --toolbar-field-color: #dce0d9 !important;
+  --toolbar-field-border-color: #4f5b4a !important;
+  --toolbar-field-focus-background-color: #282d1c !important;
+  --toolbar-field-focus-color: #dce0d9 !important;
+  --toolbar-field-focus-border-color: #a67c52 !important;
+  --sidebar-background-color: #1c1e13 !important;
+  --sidebar-text-color: #dce0d9 !important;
+  --lwt-sidebar-background-color: #1c1e13 !important;
+  --lwt-sidebar-text-color: #dce0d9 !important;
+  --lwt-toolbar-field-highlight: #a67c52 !important;
+  --lwt-toolbar-field-highlight-text: #1c1e13 !important;
+  --lwt-accent-color: #1c1e13 !important;
+}
+
+#main-window,
+#navigator-toolbox,
+#nav-bar,
+#TabsToolbar,
+#toolbar-menubar,
+#PersonalToolbar {
+  background-color: #1c1e13 !important;
+  color: #dce0d9 !important;
+}
+
+#navigator-toolbox:not(:hover):not(:focus-within) #toolbar-menubar > * {
+  background-color: #1c1e13 !important;
+}
+
+.tabbrowser-tab[selected] .tab-background { background-color: #282d1c !important; }
+.tab-label, .tab-text { color: #dce0d9 !important; }
+
+#urlbar, #urlbar-background, #urlbar-input-container, .urlbar-input-box {
+  background-color: #282d1c !important;
+  color: #dce0d9 !important;
+  border-color: #4f5b4a !important;
+  outline: none !important;
+}
+
+#urlbar[focused] > #urlbar-background {
+  border-color: #a67c52 !important;
+  box-shadow: none !important;
+}
+
+.urlbarView, .urlbarView-body-inner, .urlbarView-results {
+  background-color: #282d1c !important;
+  color: #dce0d9 !important;
+}
+
+.urlbarView-row:hover, .urlbarView-row[selected] { background-color: #323826 !important; }
+.urlbarView-title, .urlbarView-secondary, .urlbarView-action { color: #dce0d9 !important; }
+.urlbarView-url { color: #83a598 !important; }
+
+#appMenu-popup,
+menupopup,
+.panel-arrowcontent,
+.autocomplete-richlistbox-popup {
+  background-color: #282d1c !important;
+  color: #dce0d9 !important;
+  border-color: #4f5b4a !important;
+}
+
+menuitem:hover, menuitem[_moz-menuactive="true"] {
+  background-color: #323826 !important;
+}
+
+#FindToolbar {
+  background-color: #1c1e13 !important;
+  color: #dce0d9 !important;
+}
+LWCSS
+    printf '%s' "$LIBREWOLF_BEHAVIOR" >> "$LIBREWOLF_CHROME"
+
+    # userContent — páginas escuras
+    cat > "$LIBREWOLF_CONTENT" <<'UCCSS'
+/* Yerba Mate — fundo escuro em páginas sem background explícito */
+@-moz-document url("about:blank"),
+               url("about:newtab"),
+               url("about:home") {
+  html, body { background-color: #1c1e13 !important; color: #dce0d9 !important; }
+}
+UCCSS
+
     dark_val=1
+    cs_val=0   # prefers-color-scheme: dark
   fi
 
-  # Atualiza ui.systemUsesDarkTheme no user.js para o Tridactyl seguir via prefers-color-scheme
-  if grep -q 'ui.systemUsesDarkTheme' "$LIBREWOLF_USERJS" 2>/dev/null; then
-    sed -i "s/user_pref(\"ui.systemUsesDarkTheme\".*$/user_pref(\"ui.systemUsesDarkTheme\", $dark_val);/" "$LIBREWOLF_USERJS"
-  else
-    echo "user_pref(\"ui.systemUsesDarkTheme\", $dark_val);" >> "$LIBREWOLF_USERJS"
-  fi
+  # Atualiza user.js — ui.systemUsesDarkTheme e prefers-color-scheme override
+  for pref_key in 'ui.systemUsesDarkTheme' 'layout.css.prefers-color-scheme.content-override'; do
+    if [[ "$pref_key" == 'ui.systemUsesDarkTheme' ]]; then
+      pref_val=$dark_val
+    else
+      pref_val=$cs_val
+    fi
+    if grep -q "\"$pref_key\"" "$LIBREWOLF_USERJS" 2>/dev/null; then
+      sed -i "s/user_pref(\"$pref_key\".*$/user_pref(\"$pref_key\", $pref_val);/" "$LIBREWOLF_USERJS"
+    else
+      echo "user_pref(\"$pref_key\", $pref_val);" >> "$LIBREWOLF_USERJS"
+    fi
+  done
 fi
