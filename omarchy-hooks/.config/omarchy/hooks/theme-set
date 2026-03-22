@@ -40,3 +40,71 @@ EOF
 EOF
   fi
 fi
+
+# Sincroniza o tema do LibreWolf
+LIBREWOLF_CHROME="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/chrome/userChrome.css"
+LIBREWOLF_USERJS="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/user.js"
+
+LIBREWOLF_EXTRA_CSS='
+statuspanel[type="overLink"],
+#statuspanel[type="overLink"] {
+  display: none !important;
+}
+
+:root:not([customizing]) #navigator-toolbox:not(:hover):not(:focus-within) #nav-bar {
+  max-height: 0;
+  min-height: 0!important;
+  --tridactyl-auto-show-zone: 10px;
+  margin-bottom: calc(-1 * var(--tridactyl-auto-show-zone));
+  opacity: 0;
+}
+
+#navigator-toolbox::after {
+  display: none !important;
+}
+
+:root:not([customizing]) #navigator-toolbox:not(:hover):not(:focus-within) #urlbar {
+  min-height: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+:root:not([customizing]) #navigator-toolbox #urlbar-container {
+  --urlbar-container-height: auto !important;
+}
+
+#navigator-toolbox:not(:hover):not(:focus-within) #toolbar-menubar > * {
+  background-color: rgb(232, 232, 231);
+}
+
+#main-window[sizemode="maximized"] #content-deck {
+  padding-top: 8px;
+}
+
+:root:not([customizing]) #navigator-toolbox:not(:hover):not(:focus-within) #TabsToolbar {
+  visibility: collapse;
+}
+
+:root:not([customizing]) #navigator-toolbox:not(:hover):not(:focus-within) {
+  max-height: 1px;
+  min-height: calc(0px);
+  overflow: hidden;
+}
+'
+
+if [[ -f "$LIBREWOLF_CHROME" ]]; then
+  if [[ -f "$LIGHT_MODE" ]]; then
+    printf '/* Tererê — light */\n@import url("/home/nfvelten/code/zen-terere/chrome.css");\n%s' "$LIBREWOLF_EXTRA_CSS" > "$LIBREWOLF_CHROME"
+    dark_val=0
+  else
+    printf '/* Yerba Mate — dark */\n@import url("/home/nfvelten/code/zen-yerba-mate/chrome.css");\n%s' "$LIBREWOLF_EXTRA_CSS" > "$LIBREWOLF_CHROME"
+    dark_val=1
+  fi
+
+  # Atualiza ui.systemUsesDarkTheme no user.js para o Tridactyl seguir via prefers-color-scheme
+  if grep -q 'ui.systemUsesDarkTheme' "$LIBREWOLF_USERJS" 2>/dev/null; then
+    sed -i "s/user_pref(\"ui.systemUsesDarkTheme\".*$/user_pref(\"ui.systemUsesDarkTheme\", $dark_val);/" "$LIBREWOLF_USERJS"
+  else
+    echo "user_pref(\"ui.systemUsesDarkTheme\", $dark_val);" >> "$LIBREWOLF_USERJS"
+  fi
+fi
