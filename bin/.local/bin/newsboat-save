@@ -1,28 +1,43 @@
 #!/usr/bin/env bash
-# newsboat-save <url> <title>
+# newsboat-save <url>
 # Faz scraping do artigo, resume com claude e salva no vault
 
 URL="$1"
-TITLE="${2:-Artigo sem título}"
 VAULT="$HOME/amphora"
 DATE=$(date +%d-%m-%Y)
 MONTHS=("" "Janeiro" "Fevereiro" "Março" "Abril" "Maio" "Junho" "Julho" "Agosto" "Setembro" "Outubro" "Novembro" "Dezembro")
 DAILY="$VAULT/Daily Notes/$(date +%Y)/${MONTHS[$(date +%-m)]}/$DATE.md"
 
-notify-send -a "Newsboat" "📰 Salvando..." "$TITLE"
+notify-send -a "Newsboat" "📰 Salvando..." "$URL"
+
+# Baixa HTML uma vez
+RAW_HTML=$(curl -sL "$URL" 2>/dev/null)
+
+# Extrai título da tag <title> do HTML
+HTML_TITLE=$(echo "$RAW_HTML" | grep -oiP '(?<=<title>)[^<]+' | head -1 | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+# Decodifica entidades HTML
+HTML_TITLE=$(echo "$HTML_TITLE" | python3 -c "import sys, html; print(html.unescape(sys.stdin.read().strip()))" 2>/dev/null)
+
+# Extrai título do slug da URL como segundo fallback
+URL_TITLE=$(echo "$URL" | grep -oP '[^/?#]+(?=[/?#]|$)' | grep -v '\.' | tail -1 | tr '-' ' ' | sed 's/\b\(.\)/\u\1/g')
 
 # Extrai conteúdo limpo com rdrview
-CONTENT=$(rdrview -T title,body "$URL" 2>/dev/null)
+CONTENT=$(rdrview -T body "$URL" 2>/dev/null)
 
 if [ -z "$CONTENT" ]; then
-  # Fallback: curl simples
-  CONTENT=$(curl -sL "$URL" | sed 's/<[^>]*>//g' | tr -s ' \n' | head -c 8000)
+  # Fallback: w3m renderiza HTML como texto limpo
+  CONTENT=$(echo "$RAW_HTML" | w3m -dump -T text/html 2>/dev/null | head -c 8000)
 fi
+
+# Prioridade: título do HTML > slug da URL
+TITLE="${HTML_TITLE:-$URL_TITLE}"
 
 if [ -z "$CONTENT" ]; then
   notify-send -a "Newsboat" "❌ Erro" "Não foi possível extrair o conteúdo."
   exit 1
 fi
+
+TITLE="${TITLE:-Artigo sem título}"
 
 # Resumo com claude
 SUMMARY=$("$HOME/.local/bin/claude" -p "Você é um assistente de leitura. Resuma o artigo abaixo em português com: **Ideia principal**, **Pontos-chave** (3-5 bullets) e **Por que importa**. Seja conciso.
@@ -51,12 +66,6 @@ url: $URL
 ## Resumo
 
 $SUMMARY
-
----
-
-## Conteúdo original
-
-$CONTENT
 NOTE
 
 # Linka na daily note
