@@ -1,0 +1,6 @@
+[submodule "omarchy-themes/.config/omarchy/themes/yerba-mate"]
+	path = omarchy-themes/.config/omarchy/themes/yerba-mate
+	url = https://github.com/nfvelten/omarchy-yerba-mate.git
+[submodule "omarchy-themes/.config/omarchy/themes/terere"]
+	path = omarchy-themes/.config/omarchy/themes/terere
+	url = https://github.com/nfvelten/omarchy-terere.git

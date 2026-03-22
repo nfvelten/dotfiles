@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+VAULT="$HOME/amphora"
+repo=$(basename "$(git rev-parse --show-toplevel)")
+
+# Não logar commits do próprio vault
+[ "$repo" = "amphora" ] && exit 0
+
+commit_msg=$(git log -1 --pretty=%s)
+commit_hash=$(git log -1 --pretty=%h)
+branch=$(git branch --show-current)
+months=("" "Janeiro" "Fevereiro" "Março" "Abril" "Maio" "Junho" "Julho" "Agosto" "Setembro" "Outubro" "Novembro" "Dezembro")
+daily="$VAULT/Daily Notes/$(date +%Y)/${months[$(date +%-m)]}/$(date +%d-%m-%Y).md"
+
+[ ! -f "$daily" ] && exit 0
+
+entry="- 󰊢 \`$commit_hash\` **$repo** ($branch): $commit_msg"
+
+if grep -q "^### Tarefas incompletas" "$daily"; then
+  sed -i "/^### Tarefas incompletas/i\\$entry" "$daily"
+else
+  echo "$entry" >> "$daily"
+fi
