@@ -20,8 +20,11 @@ if [ -f "$PIDFILE" ]; then
   notify "⏹ Gravação parada" "Transcrevendo em background..."
 
   (
+    # Aguarda arquivo fechar antes de transcrever
+    sleep 1
+
     # Transcrição
-    TRANSCRIPT=$(meeting-transcribe "$AUDIOFILE")
+    TRANSCRIPT=$("$HOME/.local/bin/meeting-transcribe" "$AUDIOFILE" 2>/tmp/meeting-transcribe.log)
 
     if [ -z "$TRANSCRIPT" ]; then
       notify "❌ Sem fala detectada" "Nenhum conteúdo para salvar."
