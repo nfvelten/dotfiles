@@ -30,8 +30,12 @@ print(text)
 EOF
     )
 
+    # Remove linhas com só pontos (silêncio/ruído)
+    TRANSCRIPT=$(echo "$TRANSCRIPT" | grep -v '^\.*$' | sed '/^$/d')
+
     if [ -z "$TRANSCRIPT" ]; then
-      notify "❌ Erro" "Transcrição vazia ou falhou."
+      notify "❌ Sem fala detectada" "Nenhum conteúdo para salvar."
+      rm -f "$AUDIOFILE"
       exit 1
     fi
 
