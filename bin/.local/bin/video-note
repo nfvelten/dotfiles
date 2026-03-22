@@ -17,16 +17,19 @@ notify-send -a "Video Note" "🎬 Buscando legenda..." "$URL"
 
 # Pega título e legenda (pt, pt-BR, en — nessa ordem de preferência)
 yt-dlp \
+  --no-playlist \
   --write-auto-sub \
   --write-sub \
   --sub-lang "pt,pt-BR,en" \
   --sub-format "vtt" \
   --skip-download \
+  --ignore-errors \
+  --extractor-args "youtube:skip=dash,hls" \
   --output "$TMPDIR/%(title)s" \
   "$URL" 2>/tmp/video-note.log
 
 # Pega título do vídeo
-TITLE=$(yt-dlp --get-title "$URL" 2>/dev/null)
+TITLE=$(yt-dlp --no-playlist --get-title "$URL" 2>/dev/null)
 if [ -z "$TITLE" ]; then
   notify-send -a "Video Note" "❌ Erro" "Não foi possível acessar o vídeo."
   rm -rf "$TMPDIR"
