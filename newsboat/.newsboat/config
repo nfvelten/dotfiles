@@ -1,10 +1,10 @@
 browser "rdrview -B w3m %u"
 
-# Salvar artigo no vault sem abrir browser — ,s
-macro s set browser "$HOME/.local/bin/newsboat-save-bg %u \"%t\"" ; open-in-browser ; set browser "rdrview -B w3m %u"
+# Salvar artigo no vault — ,s na lista de artigos
+macro s set browser "$HOME/.local/bin/newsboat-save %u \"%t\" &" ; open-in-browser ; set browser "rdrview -B w3m %u"
 
-# Salvar + abrir no leitor — ,o
-macro o open-in-browser
+# Salvar + abrir ao pressionar ,o
+macro o exec "$HOME/.local/bin/newsboat-save %u \"%t\" &" ; open-in-browser
 
 # Cores — Yerba Mate
 color background          default   default
