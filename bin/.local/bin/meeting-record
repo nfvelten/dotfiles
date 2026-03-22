@@ -40,7 +40,7 @@ Você é um assistente que resume reuniões corporativas em português. Com base
 Transcrição:
 $TRANSCRIPT
 PROMPT
-    SUMMARY=$(claude -p "$(cat "$PROMPT_FILE")" < /dev/null 2>/tmp/meeting-claude.log)
+    SUMMARY=$("$HOME/.local/bin/claude" -p "$(cat "$PROMPT_FILE")" < /dev/null 2>/tmp/meeting-claude.log)
     rm -f "$PROMPT_FILE"
 
     # Salvar nota no vault
