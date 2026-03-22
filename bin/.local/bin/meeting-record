@@ -21,17 +21,7 @@ if [ -f "$PIDFILE" ]; then
 
   (
     # Transcrição
-    TRANSCRIPT=$(python3 - <<'EOF'
-from faster_whisper import WhisperModel
-model = WhisperModel("medium", device="cpu", compute_type="int8")
-segments, info = model.transcribe("/tmp/meeting-record.wav", language="pt", beam_size=5)
-text = "\n".join(seg.text.strip() for seg in segments)
-print(text)
-EOF
-    )
-
-    # Remove linhas com só pontos (silêncio/ruído)
-    TRANSCRIPT=$(echo "$TRANSCRIPT" | grep -v '^\.*$' | sed '/^$/d')
+    TRANSCRIPT=$(meeting-transcribe "$AUDIOFILE")
 
     if [ -z "$TRANSCRIPT" ]; then
       notify "❌ Sem fala detectada" "Nenhum conteúdo para salvar."
