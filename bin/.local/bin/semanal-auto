@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# semanal-auto — agrega daily notes da semana e gera revisão com Claude
+
+VAULT="$HOME/amphora"
+MONTHS=("" "Janeiro" "Fevereiro" "Março" "Abril" "Maio" "Junho" "Julho" "Agosto" "Setembro" "Outubro" "Novembro" "Dezembro")
+WEEK_NUM=$(date +%V)
+YEAR=$(date +%Y)
+TODAY=$(date +%d-%m-%Y)
+
+notify-send -a "Vault" "📅 Gerando revisão semanal..." "Semana $WEEK_NUM — coletando notas"
+
+# Coletar daily notes dos últimos 7 dias
+NOTES=""
+DAYS_FOUND=0
+for i in $(seq 0 6); do
+  day_date=$(date -d "$i days ago" +%d-%m-%Y)
+  year=$(date -d "$i days ago" +%Y)
+  month_num=$(date -d "$i days ago" +%-m)
+  month="${MONTHS[$month_num]}"
+  note_path="$VAULT/Daily Notes/$year/$month/$day_date.md"
+
+  if [ -f "$note_path" ]; then
+    NOTES+="=== $day_date ===
+$(cat "$note_path")
+
+"
+    DAYS_FOUND=$((DAYS_FOUND + 1))
+  fi
+done
+
+if [ "$DAYS_FOUND" -eq 0 ]; then
+  notify-send -a "Vault" "❌ Nenhuma nota encontrada" "Nada para revisar esta semana"
+  exit 1
+fi
+
+# Verificar se revisão já existe
+REVIEW_DIR="$VAULT/Daily Notes/$YEAR/${MONTHS[$(date +%-m)]}"
+REVIEW_FILE="$REVIEW_DIR/Revisão Semanal - Semana $WEEK_NUM.md"
+
+if [ -f "$REVIEW_FILE" ]; then
+  notify-send -a "Vault" "⚠️ Revisão já existe" "Semana $WEEK_NUM já foi gerada"
+  exit 0
+fi
+
+# Gerar resumo com Claude
+SUMMARY=$("$HOME/.local/bin/claude" -p "Você é um assistente de revisão semanal. Com base nas daily notes abaixo, gere uma revisão semanal estruturada em português.
+
+## O que foi feito
+(bullets — tarefas concluídas, commits relevantes, projetos avançados)
+
+## Aprendizados
+(o que foi aprendido, descoberto ou resolvido)
+
+## Pendências
+(tarefas não concluídas que devem ir para a próxima semana)
+
+## Destaque da semana
+(o ponto mais significativo — uma frase)
+
+---
+Daily notes ($DAYS_FOUND dias):
+
+$NOTES" < /dev/null 2>/dev/null)
+
+if [ -z "$SUMMARY" ]; then
+  notify-send -a "Vault" "❌ Erro" "Claude não retornou resumo"
+  exit 1
+fi
+
+mkdir -p "$REVIEW_DIR"
+cat > "$REVIEW_FILE" <<NOTE
+---
+tags: [revisão_semanal]
+semana: $WEEK_NUM
+criado: $TODAY
+---
+# Revisão Semanal — Semana $WEEK_NUM ($YEAR)
+
+$SUMMARY
+NOTE
+
+notify-send -a "Vault" "✅ Revisão semanal criada" "Semana $WEEK_NUM — $DAYS_FOUND dias agregados" -t 6000

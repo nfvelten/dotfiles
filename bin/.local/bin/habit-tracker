@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# habit-tracker — rastreia hábitos recorrentes das daily notes
+# Uso: habit-tracker [dias] (padrão: 7)
+
+VAULT="$HOME/amphora"
+MONTHS=("" "Janeiro" "Fevereiro" "Março" "Abril" "Maio" "Junho" "Julho" "Agosto" "Setembro" "Outubro" "Novembro" "Dezembro")
+DAYS=${1:-7}
+TODAY=$(date +%d-%m-%Y)
+
+# Hábitos a rastrear: "label|regex_para_detectar_task"
+HABITS=(
+  "Academia|academia"
+  "Leitura|[Ll]er [0-9]"
+  "Estudo|[Ee]studar [0-9]"
+)
+
+declare -A HABIT_TOTAL
+declare -A HABIT_DONE
+
+for entry in "${HABITS[@]}"; do
+  label="${entry%%|*}"
+  HABIT_TOTAL[$label]=0
+  HABIT_DONE[$label]=0
+done
+
+NOTES_FOUND=0
+for i in $(seq 0 $((DAYS - 1))); do
+  day_date=$(date -d "$i days ago" +%d-%m-%Y)
+  year=$(date -d "$i days ago" +%Y)
+  month_num=$(date -d "$i days ago" +%-m)
+  month="${MONTHS[$month_num]}"
+  note_path="$VAULT/Daily Notes/$year/$month/$day_date.md"
+
+  [ ! -f "$note_path" ] && continue
+  NOTES_FOUND=$((NOTES_FOUND + 1))
+
+  for entry in "${HABITS[@]}"; do
+    label="${entry%%|*}"
+    pattern="${entry##*|}"
+    if grep -qiE "$pattern" "$note_path"; then
+      HABIT_TOTAL[$label]=$((${HABIT_TOTAL[$label]} + 1))
+      if grep -qiE "\* \[x\].*$pattern" "$note_path"; then
+        HABIT_DONE[$label]=$((${HABIT_DONE[$label]} + 1))
+      fi
+    fi
+  done
+done
+
+if [ "$NOTES_FOUND" -eq 0 ]; then
+  echo "Nenhuma daily note encontrada nos últimos $DAYS dias."
+  exit 1
+fi
+
+# Montar relatório
+REPORT="---
+tags: [hábitos]
+criado: $TODAY
+periodo: últimos ${DAYS} dias
+---
+# Tracker de Hábitos — $TODAY
+
+> $NOTES_FOUND daily notes analisadas (últimos $DAYS dias)
+
+| Hábito | Feito | Registrado | Taxa |
+|--------|-------|------------|------|
+"
+
+for entry in "${HABITS[@]}"; do
+  label="${entry%%|*}"
+  total=${HABIT_TOTAL[$label]}
+  done_count=${HABIT_DONE[$label]}
+  if [ "$total" -gt 0 ]; then
+    pct=$((done_count * 100 / total))
+    bar=""
+    for j in $(seq 1 10); do
+      [ $((j * 10)) -le "$pct" ] && bar+="█" || bar+="░"
+    done
+    REPORT+="| $label | $done_count | $total | $bar $pct% |
+"
+  else
+    REPORT+="| $label | — | — | sem registros |
+"
+  fi
+done
+
+# Salvar no vault
+HABIT_DIR="$VAULT/Pessoal/Sistema"
+HABIT_FILE="$HABIT_DIR/Hábitos $(date +%Y-%m-%d).md"
+mkdir -p "$HABIT_DIR"
+echo "$REPORT" > "$HABIT_FILE"
+
+echo "$REPORT"
+notify-send -a "Vault" "📊 Hábitos gerados" "$NOTES_FOUND dias analisados" -t 5000
