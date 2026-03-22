@@ -43,7 +43,7 @@ EOF
     SUMMARY=$(claude -p "Você é um assistente que resume reuniões corporativas em português. Com base na transcrição abaixo, gere um resumo estruturado com: **Contexto**, **Decisões tomadas**, **Próximos passos** e **Participantes mencionados** (se identificáveis). Seja conciso e direto.
 
 Transcrição:
-$TRANSCRIPT")
+$TRANSCRIPT" < /dev/null)
 
     # Salvar nota no vault
     mkdir -p "$MEETINGS_DIR"
