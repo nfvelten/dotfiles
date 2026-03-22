@@ -33,10 +33,15 @@ if [ -f "$PIDFILE" ]; then
     fi
 
     # Resumo com claude CLI
-    SUMMARY=$(claude -p "Você é um assistente que resume reuniões corporativas em português. Com base na transcrição abaixo, gere um resumo estruturado com: **Contexto**, **Decisões tomadas**, **Próximos passos** e **Participantes mencionados** (se identificáveis). Seja conciso e direto.
+    PROMPT_FILE=$(mktemp /tmp/meeting-prompt.XXXXXX)
+    cat > "$PROMPT_FILE" <<PROMPT
+Você é um assistente que resume reuniões corporativas em português. Com base na transcrição abaixo, gere um resumo estruturado com: **Contexto**, **Decisões tomadas**, **Próximos passos** e **Participantes mencionados** (se identificáveis). Seja conciso e direto.
 
 Transcrição:
-$TRANSCRIPT" < /dev/null)
+$TRANSCRIPT
+PROMPT
+    SUMMARY=$(claude -p "$(cat "$PROMPT_FILE")" < /dev/null 2>/tmp/meeting-claude.log)
+    rm -f "$PROMPT_FILE"
 
     # Salvar nota no vault
     mkdir -p "$MEETINGS_DIR"
