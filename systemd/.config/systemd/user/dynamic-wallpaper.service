@@ -3,6 +3,7 @@ Description=Dynamic wallpaper based on time of day
 
 [Service]
 Type=oneshot
+KillMode=none
 Environment=WAYLAND_DISPLAY=wayland-1
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
