@@ -51,6 +51,9 @@ section() {
   echo ""
 }
 
+# Small delay so quick Super+key combos don't flash the hint
+sleep 0.3
+
 clear
 echo ""
 echo -e "  ${BOLD}${FG}Super${R}${GREY} — keybindings${R}"
@@ -62,5 +65,5 @@ section "Super + Alt"          '$1 == "ALT"'
 section "Super + Shift + Alt"  '$1 ~ /SHIFT.*ALT|ALT.*SHIFT/'
 section "Super + Shift + Ctrl" '$1 ~ /SHIFT.*CTRL|CTRL.*SHIFT/'
 
-echo -e "  ${GREY}any key to close${R}"
-read -rsn1
+echo -e "  ${GREY}solte Super para fechar${R}"
+sleep infinity
