@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# superkey-hint — Super key cheatsheet, which-key style
+
+OMARCHY="$HOME/.local/share/omarchy/config/hypr/bindings.conf"
+USER_CONF="$HOME/.config/hypr/bindings.conf"
+
+# Yerba Mate palette
+R='\033[0m'
+BOLD='\033[1m'
+GREEN='\033[38;2;143;179;57m'
+AMBER='\033[38;2;166;124;82m'
+BLUE='\033[38;2;126;178;209m'
+GREY='\033[38;2;79;91;74m'
+FG='\033[38;2;220;224;217m'
+
+# Parse bindd lines → MODS|KEY|DESC
+# Strips "SUPER" prefix from mods so grouping is by remaining modifiers
+parse() {
+  grep -h "^bindd\s*=" "$@" 2>/dev/null \
+  | sed 's/^bindd\s*=\s*//' \
+  | awk -F',' '{
+      mods=$1; key=$2; desc=$3
+      gsub(/^[ \t]+|[ \t]+$/, "", mods)
+      gsub(/^[ \t]+|[ \t]+$/, "", key)
+      gsub(/^[ \t]+|[ \t]+$/, "", desc)
+      sub(/^SUPER[ \t]*/, "", mods)
+      gsub(/^[ \t]+|[ \t]+$/, "", mods)
+      print mods "|" key "|" desc
+    }'
+}
+
+# Render a section: title + filtered rows
+section() {
+  local title="$1"
+  local filter="$2"
+
+  local rows
+  rows=$(parse "$OMARCHY" "$USER_CONF" \
+    | awk -F'|' "$filter"' { printf "%-12s  %s\n", toupper($2), $3 }' \
+    | sort -u)
+
+  [ -z "$rows" ] && return
+
+  echo -e "${AMBER}${BOLD}  $title${R}"
+  echo -e "${GREY}  ──────────────────────────────────${R}"
+  echo "$rows" | while IFS= read -r line; do
+    key=$(echo "$line" | awk '{print $1}')
+    desc=$(echo "$line" | sed 's/^[^ ]*[ ]*//' | xargs)
+    printf "  ${GREEN}%-12s${R}  ${FG}%s${R}\n" "$key" "$desc"
+  done
+  echo ""
+}
+
+clear
+echo ""
+echo -e "  ${BOLD}${FG}Super${R}${GREY} — keybindings${R}"
+echo ""
+
+section "Super"                '$1 == ""'
+section "Super + Shift"        '$1 == "SHIFT"'
+section "Super + Alt"          '$1 == "ALT"'
+section "Super + Shift + Alt"  '$1 ~ /SHIFT.*ALT|ALT.*SHIFT/'
+section "Super + Shift + Ctrl" '$1 ~ /SHIFT.*CTRL|CTRL.*SHIFT/'
+
+echo -e "  ${GREY}any key to close${R}"
+read -rsn1
