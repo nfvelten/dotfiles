@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # superkey-hint — Super key cheatsheet, which-key style
 
+# Write PID immediately so the close binding can kill us even during the delay
+echo $$ > /tmp/superkey-hint.pid
+trap 'rm -f /tmp/superkey-hint.pid' EXIT
+
 OMARCHY="$HOME/.local/share/omarchy/config/hypr/bindings.conf"
 USER_CONF="$HOME/.config/hypr/bindings.conf"
 
