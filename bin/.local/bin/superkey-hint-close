@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
-# Kills the superkey-hint script and closes the alacritty window
-pkill -f "superkey-hint$" 2>/dev/null
+# Mata apenas o processo bash rodando superkey-hint (não o alacritty pai)
+# Quando bash morre, alacritty fecha automaticamente
+for pid in $(pgrep -f "superkey-hint"); do
+    [ "$(cat /proc/$pid/comm 2>/dev/null)" = "bash" ] && kill "$pid" 2>/dev/null
+done
 hyprctl dispatch closewindow class:superkey-hint 2>/dev/null
