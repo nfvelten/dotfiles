@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Kills the superkey-hint script and closes the alacritty window
+pkill -f "superkey-hint$" 2>/dev/null
+hyprctl dispatch closewindow class:superkey-hint 2>/dev/null
