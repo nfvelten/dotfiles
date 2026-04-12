@@ -1,0 +1,21 @@
+#!/bin/bash
+# librewolf-themed — atualiza o tema no user.js antes de abrir o LibreWolf
+# Garante que o browser sempre abre com o tema certo, independente da ordem de boot
+
+LIBREWOLF_USERJS="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/user.js"
+HOUR=$(date +%-H)
+
+if (( HOUR >= 6 && HOUR < 18 )); then
+  dark_val=0
+  cs_val=1
+else
+  dark_val=1
+  cs_val=0
+fi
+
+if [[ -f "$LIBREWOLF_USERJS" ]]; then
+  sed -i "s/user_pref(\"ui.systemUsesDarkTheme\".*$/user_pref(\"ui.systemUsesDarkTheme\", $dark_val);/" "$LIBREWOLF_USERJS"
+  sed -i "s/user_pref(\"layout.css.prefers-color-scheme.content-override\".*$/user_pref(\"layout.css.prefers-color-scheme.content-override\", $cs_val);/" "$LIBREWOLF_USERJS"
+fi
+
+exec librewolf "$@"

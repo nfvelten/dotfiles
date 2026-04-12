@@ -3,7 +3,7 @@ Description=Run dynamic wallpaper every hour
 
 [Timer]
 OnCalendar=hourly
-OnActiveSec=10
+OnStartupSec=60s
 Persistent=true
 
 [Install]
