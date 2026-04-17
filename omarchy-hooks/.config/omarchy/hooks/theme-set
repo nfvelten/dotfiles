@@ -45,7 +45,7 @@ fi
 LIBREWOLF_CHROME="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/chrome/userChrome.css"
 LIBREWOLF_CONTENT="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/chrome/userContent.css"
 LIBREWOLF_USERJS="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default/user.js"
-LIBREWOLF_THEME="$HOME/code/librewolf-yerba-mate"
+LIBREWOLF_THEME="$HOME/code/personal/mateCreations/librewolf-yerba-mate"
 
 if [[ -f "$LIBREWOLF_CHROME" ]]; then
   if [[ -f "$LIGHT_MODE" ]]; then
