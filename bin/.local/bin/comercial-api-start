@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+COMERCIAL_API_DIR="$HOME/code/work/comercial-api"
+PORT=8020
+LOG_FILE="/tmp/comercial-api.log"
+
+# Kill anything on port 8020
+if lsof -ti :"$PORT" &>/dev/null; then
+    echo "Matando processo na porta $PORT..."
+    lsof -ti :"$PORT" | xargs kill -9
+    sleep 1
+fi
+
+echo "Iniciando comercial-api (profile: desenvolvimento)..."
+echo "Log: $LOG_FILE"
+echo ""
+
+cd "$COMERCIAL_API_DIR"
+nohup mvn spring-boot:run -Dspring-boot.run.profiles=desenvolvimento \
+    > "$LOG_FILE" 2>&1 &
+
+PID=$!
+echo "PID: $PID"
+echo "Aguardando startup..."
+
+# Poll até Started ou falha
+TIMEOUT=300
+ELAPSED=0
+while [[ $ELAPSED -lt $TIMEOUT ]]; do
+    if grep -qE "Started App in" "$LOG_FILE" 2>/dev/null; then
+        echo ""
+        echo "OK — comercial-api rodando em http://localhost:$PORT"
+        echo "Log: tail -f $LOG_FILE"
+        exit 0
+    fi
+    if grep -qE "APPLICATION FAILED|BUILD FAILURE|failed to start" "$LOG_FILE" 2>/dev/null; then
+        echo ""
+        echo "FALHA ao iniciar. Últimas linhas:"
+        tail -20 "$LOG_FILE"
+        exit 1
+    fi
+    sleep 5
+    ELAPSED=$((ELAPSED + 5))
+    printf "."
+done
+
+echo ""
+echo "Timeout após ${TIMEOUT}s. Log: $LOG_FILE"
+exit 1
