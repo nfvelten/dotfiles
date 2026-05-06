@@ -75,8 +75,8 @@ $TRANSCRIPT" < /dev/null 2>/dev/null)
 
 # Save note
 SAFE_TITLE=$(echo "$TITLE" | tr -d '/:*?"<>|\\' | cut -c1-60)
-mkdir -p "$VAULT/${AMPHORA_DIR_PERSONAL:-Personal}/Videos"
-NOTE_FILE="$VAULT/${AMPHORA_DIR_PERSONAL:-Personal}/Videos/${SAFE_TITLE}.md"
+mkdir -p "$VAULT/${AMPHORA_DIR_PERSONAL:-Pessoal}/Videos"
+NOTE_FILE="$VAULT/${AMPHORA_DIR_PERSONAL:-Pessoal}/Videos/${SAFE_TITLE}.md"
 
 cat > "$NOTE_FILE" <<NOTE
 ---
