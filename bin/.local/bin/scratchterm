@@ -1,0 +1,6 @@
+#!/bin/bash
+if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:scratchterm")' > /dev/null 2>&1; then
+    hyprctl dispatch togglespecialworkspace scratchterm
+else
+    hyprctl dispatch exec "[workspace special:scratchterm silent;float;size 1000 580;center] ghostty"
+fi

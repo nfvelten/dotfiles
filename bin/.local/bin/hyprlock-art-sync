@@ -1,0 +1,13 @@
+#!/bin/bash
+# Keeps /tmp/hyprlock-art.jpg updated whenever the track changes
+fetch_art() {
+    local url
+    url=$(playerctl metadata mpris:artUrl 2>/dev/null)
+    [[ -z "$url" ]] && return
+    curl -s "$url" -o /tmp/hyprlock-art.jpg 2>/dev/null
+}
+
+fetch_art
+playerctl --follow metadata mpris:artUrl 2>/dev/null | while read -r _url; do
+    fetch_art
+done

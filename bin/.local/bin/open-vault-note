@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+FILE="$1"
+[[ -z "$FILE" ]] && exit 1
+
+if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:vault-note")' > /dev/null 2>&1; then
+    hyprctl dispatch closewindow address:"$(hyprctl clients -j | jq -r '.[] | select(.workspace.name == "special:vault-note") | .address' | head -1)"
+    sleep 0.2
+fi
+
+hyprctl dispatch exec "[workspace special:vault-note silent;float;size 900 650;center] /usr/bin/ghostty -e nvim '$FILE'"
+
+sleep 0.5
+hyprctl dispatch togglespecialworkspace vault-note

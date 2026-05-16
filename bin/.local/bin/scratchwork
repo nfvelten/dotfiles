@@ -1,0 +1,8 @@
+#!/bin/bash
+if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:work-nvim")' > /dev/null 2>&1; then
+    hyprctl dispatch togglespecialworkspace work-nvim
+else
+    hyprctl dispatch exec "[workspace special:work-nvim silent;float;size 1100 650;center] ghostty --font-size=11 --working-directory=/home/nfvelten/code/work -e nvim ."
+    sleep 0.5
+    hyprctl dispatch togglespecialworkspace work-nvim
+fi

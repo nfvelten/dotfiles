@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+ID="$1"
+[[ -z "$ID" ]] && exit 1
+
+if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:board-item")' > /dev/null 2>&1; then
+    hyprctl dispatch closewindow address:"$(hyprctl clients -j | jq -r '.[] | select(.workspace.name == "special:board-item") | .address' | head -1)"
+    sleep 0.2
+fi
+
+SCRIPT=$(cat <<EOF
+clear
+air-boards show $ID
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Comentários"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+air-boards comments $ID
+echo ""
+read -p "Enter para fechar"
+EOF
+)
+
+hyprctl dispatch exec "[workspace special:board-item silent;float;size 1100 650;center] /usr/bin/ghostty -e bash -c '$SCRIPT'"
+
+sleep 0.5
+hyprctl dispatch togglespecialworkspace board-item
