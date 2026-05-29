@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# cg-search <repo> <query> — busca símbolos no índice codegraph do repo
+repo=$1
+query=$2
+db=~/code/work/$repo/.codegraph/codegraph.db
+
+if [[ -z "$repo" || -z "$query" ]]; then
+  echo "uso: cg-search <repo> <query>"
+  exit 1
+fi
+if [[ ! -f "$db" ]]; then
+  echo "repo '$repo' não indexado. rode: cd ~/code/work/$repo && codegraph init -i"
+  exit 1
+fi
+
+sqlite3 "$db" \
+  "SELECT kind, name, file_path, start_line FROM nodes WHERE name LIKE '%$query%' AND kind != 'file' ORDER BY kind, name LIMIT 20"

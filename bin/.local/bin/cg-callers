@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# cg-callers <repo> <symbol> — quem chama o símbolo no índice codegraph
+repo=$1
+symbol=$2
+db=~/code/work/$repo/.codegraph/codegraph.db
+
+if [[ -z "$repo" || -z "$symbol" ]]; then
+  echo "uso: cg-callers <repo> <symbol>"
+  exit 1
+fi
+if [[ ! -f "$db" ]]; then
+  echo "repo '$repo' não indexado. rode: cd ~/code/work/$repo && codegraph init -i"
+  exit 1
+fi
+
+sqlite3 "$db" "
+  SELECT DISTINCT s.kind, s.name, s.file_path, s.start_line
+  FROM edges e
+  JOIN nodes s ON s.id = e.source
+  WHERE e.target = (SELECT id FROM nodes WHERE name = '$symbol' LIMIT 1)
+    AND s.kind != 'file'
+  LIMIT 20
+"
