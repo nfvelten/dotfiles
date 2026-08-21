@@ -3,42 +3,113 @@
 # Uso: dynamic-wallpaper [wallpaper-set]
 # Padrão: cliffs
 
+set -euo pipefail
+
 WALLPAPER_SET="${1:-cliffs}"
 WALLPAPER_DIR="$HOME/.config/omarchy/backgrounds/$WALLPAPER_SET"
+CURRENT_BACKGROUND_LINK="$HOME/.local/state/omarchy/current/background"
+TRANSITION_MINUTES="${DYNAMIC_WALLPAPER_TRANSITION_MINUTES:-5}"
+
 HOUR=$(date +%-H)
+MINUTE=$(date +%-M)
+SECOND=$(date +%-S)
 
 if [[ ! -d "$WALLPAPER_DIR" ]]; then
   echo "Wallpaper set '$WALLPAPER_SET' não encontrado em $WALLPAPER_DIR" >&2
   exit 1
 fi
 
-# Encontra a imagem com hora <= hora atual (mais próxima)
-BEST=""
-BEST_HOUR=-1
+pick_for_hour() {
+  local target_hour="$1"
+  local best=""
+  local best_hour=-1
+  local f fname
 
-for f in "$WALLPAPER_DIR"/*.jpg "$WALLPAPER_DIR"/*.png; do
-  [[ -f "$f" ]] || continue
-  fname=$(basename "${f%.*}")
-  [[ "$fname" =~ ^[0-9]+$ ]] || continue
-  if (( fname <= HOUR && fname > BEST_HOUR )); then
-    BEST_HOUR=$fname
-    BEST="$f"
-  fi
-done
-
-# Fallback: se nenhuma imagem for <= hora atual, usa a última do dia anterior
-if [[ -z "$BEST" ]]; then
   for f in "$WALLPAPER_DIR"/*.jpg "$WALLPAPER_DIR"/*.png; do
     [[ -f "$f" ]] || continue
     fname=$(basename "${f%.*}")
     [[ "$fname" =~ ^[0-9]+$ ]] || continue
-    if (( fname > BEST_HOUR )); then
-      BEST_HOUR=$fname
-      BEST="$f"
+    if (( fname <= target_hour && fname > best_hour )); then
+      best_hour=$fname
+      best="$f"
     fi
   done
+
+  if [[ -z "$best" ]]; then
+    for f in "$WALLPAPER_DIR"/*.jpg "$WALLPAPER_DIR"/*.png; do
+      [[ -f "$f" ]] || continue
+      fname=$(basename "${f%.*}")
+      [[ "$fname" =~ ^[0-9]+$ ]] || continue
+      if (( fname > best_hour )); then
+        best_hour=$fname
+        best="$f"
+      fi
+    done
+  fi
+
+  [[ -n "$best" ]] && realpath "$best"
+}
+
+current_link_target() {
+  if [[ -L "$CURRENT_BACKGROUND_LINK" || -f "$CURRENT_BACKGROUND_LINK" ]]; then
+    readlink -f "$CURRENT_BACKGROUND_LINK" 2>/dev/null || true
+  fi
+}
+
+ensure_link() {
+  local target="$1"
+  mkdir -p "$(dirname "$CURRENT_BACKGROUND_LINK")"
+  ln -nsf "$target" "$CURRENT_BACKGROUND_LINK"
+}
+
+set_current_background() {
+  local target="$1"
+  local previous
+  previous=$(current_link_target)
+
+  if [[ "$previous" == "$target" ]]; then
+    exit 0
+  fi
+
+  ensure_link "$target"
+  omarchy-shell -q background setInstant "$target" >/dev/null 2>&1 || true
+}
+
+start_solar_transition() {
+  local current="$1"
+  local next="$2"
+  local transition_start=$((60 - TRANSITION_MINUTES))
+  local elapsed=$(((MINUTE - transition_start) * 60 + SECOND))
+  local total=$((TRANSITION_MINUTES * 60))
+  local remaining_ms=$(((total - elapsed) * 1000))
+  local progress
+
+  ((elapsed < 0)) && elapsed=0
+  ((elapsed > total)) && elapsed=$total
+  ((remaining_ms < 1000)) && remaining_ms=1000
+
+  progress=$(awk -v elapsed="$elapsed" -v total="$total" 'BEGIN {
+    p = total > 0 ? elapsed / total : 1
+    if (p < 0) p = 0
+    if (p > 1) p = 1
+    printf "%.4f", p
+  }')
+
+  ensure_link "$current"
+  omarchy-shell -q background solarTransition "$current" "$next" "$progress" "$remaining_ms" >/dev/null 2>&1 || true
+}
+
+CURRENT=$(pick_for_hour "$HOUR")
+[[ -n "${CURRENT:-}" ]] || exit 0
+
+if (( TRANSITION_MINUTES > 0 && TRANSITION_MINUTES < 60 && MINUTE >= 60 - TRANSITION_MINUTES )); then
+  NEXT_HOUR=$(((HOUR + 1) % 24))
+  NEXT=$(pick_for_hour "$NEXT_HOUR")
+
+  if [[ -n "${NEXT:-}" && "$NEXT" != "$CURRENT" ]]; then
+    start_solar_transition "$CURRENT" "$NEXT"
+    exit 0
+  fi
 fi
 
-if [[ -n "$BEST" ]]; then
-  omarchy-theme-bg-set "$BEST"
-fi
+set_current_background "$CURRENT"

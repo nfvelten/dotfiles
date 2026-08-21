@@ -1,8 +1,9 @@
 [Unit]
-Description=Run dynamic wallpaper every hour
+Description=Run dynamic wallpaper near hour transitions
 
 [Timer]
-OnCalendar=hourly
+OnCalendar=*-*-* *:00:00
+OnCalendar=*-*-* *:55..59:00
 OnStartupSec=60s
 Persistent=true
 
