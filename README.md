@@ -56,6 +56,63 @@ Se não definir, o script procura em `~/obsidian` por padrão.
 - `stow` — `sudo pacman -S stow` (Arch) / `sudo apt install stow` (Debian)
 - `jq` — necessário para o hook do Claude Code (`omarchy-hooks`)
 
+## Stack de dev
+
+Ferramentas de linha de comando da máquina. Repo oficial do Arch, exceto onde marcado.
+
+```bash
+sudo pacman -S --needed \
+  ripgrep fd go-yq jq gron jless ripgrep-all pandoc-cli tokei \
+  ast-grep git-delta difftastic lazygit github-cli glab \
+  shellcheck shfmt just direnv watchexec \
+  podman podman-compose k9s kubectl \
+  oha hyperfine lnav mtr \
+  bat eza fzf zoxide yazi glow atuin starship btop tldr
+```
+
+AUR:
+
+```bash
+yay -S usql   # REPL universal de banco
+```
+
+Fora do gerenciador de pacote (via `mise`/npm):
+
+```bash
+npm i -g @usebruno/cli        # bru — roda a air-api-collection
+playwright install chromium   # ~650MB em ~/.cache/ms-playwright
+```
+
+### Por função
+
+| Função | Ferramenta |
+|--------|-----------|
+| Busca | `rg` texto · `fd` arquivo · `ast-grep` por AST (callers, refactor) · `rga` dentro de PDF/docx/xlsx |
+| Dados | `jq` JSON · `yq` YAML · `gron` achata pra grep · `jless` JSON grande · `pandoc` converte doc |
+| Git | `delta` pager · `difft` diff estrutural · `lazygit` TUI · `gh` GitHub · `glab` GitLab |
+| Shell | `shellcheck` lint · `shfmt` format |
+| Infra | `podman` rootless · `podman-compose` · `just` tasks · `direnv` env por dir · `watchexec` roda ao mudar |
+| Teste | `oha` carga HTTP · `hyperfine` benchmark · `bru` requests · `playwright` browser |
+| DB | `usql` REPL universal (postgres/mysql/oracle) |
+| Debug | `lnav` navegador de log · `mtr` rede · `k9s`/`kubectl` cluster |
+
+### Config manual necessária
+
+Duas instalam inertes:
+
+- **`delta`** — já configurado no módulo `git` (`core.pager`, `interactive.diffFilter`).
+  Vem junto com `./install.sh git`.
+- **`direnv`** — precisa do hook no shell, **e o `.bashrc` não é rastreado aqui**:
+  ```bash
+  echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+  ```
+
+`podman` rootless precisa de `subuid`/`subgid` (o Arch já cria no install do pacote):
+
+```bash
+grep "^$USER" /etc/subuid /etc/subgid   # esperado: <user>:100000:65536
+```
+
 ## Temas
 
 ### Yerba Mate — dark
