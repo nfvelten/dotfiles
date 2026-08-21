@@ -19,6 +19,7 @@
 #   starship        → ~/.config/starship.toml
 #   fastfetch       → ~/.config/fastfetch/
 #   omarchy-hooks   → ~/.config/omarchy/hooks/
+#   omarchy-shell   → ~/.config/omarchy/ (shell.json + plugins locais)
 #   hypr            → ~/.config/hypr/ (bindings + windowrules)
 #   bin             → ~/.local/bin/ (daily-note, omarchy-theme-auto)
 #   systemd         → ~/.config/systemd/user/ (timer troca automática de tema)
@@ -35,7 +36,7 @@
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STOW_MODULES=(bash git nvim omarchy-hooks hypr bin systemd \
+STOW_MODULES=(bash git nvim omarchy-hooks omarchy-shell hypr bin systemd \
                alacritty ghostty tmux lazygit starship fastfetch)
 OBSIDIAN_MODULE="obsidian"
 

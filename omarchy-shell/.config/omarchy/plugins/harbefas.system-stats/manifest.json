@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "harbefas.system-stats",
+  "name": "System stats",
+  "version": "1.0.0",
+  "author": "harbefas",
+  "description": "Compact CPU (per-core + temp), memory, disk, and process dashboard",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Panel.qml" },
+  "barWidget": {
+    "displayName": "System stats",
+    "description": "Live hardware and process metrics",
+    "category": "System",
+    "allowMultiple": false
+  }
+}

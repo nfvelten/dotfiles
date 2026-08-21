@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+set -u
+
+cpu_line=$(awk '/^cpu / {print $2+$3+$4+$5+$6+$7+$8, $5+$6}' /proc/stat)
+read -r cpu_total cpu_idle <<<"$cpu_line"
+
+coretemp_dir=$(grep -l '^coretemp$' /sys/class/hwmon/hwmon*/name 2>/dev/null | head -1)
+coretemp_dir=${coretemp_dir%/name}
+core_temps=()
+if [[ -n "$coretemp_dir" ]]; then
+  for label_file in "$coretemp_dir"/temp*_label; do
+    [[ -e "$label_file" ]] || continue
+    label=$(<"$label_file")
+    [[ "$label" =~ ^Core\ ([0-9]+)$ ]] || continue
+    input_file=${label_file%_label}_input
+    core_temps[${BASH_REMATCH[1]}]=$(( $(<"$input_file") / 1000 ))
+  done
+fi
+physical_cores=${#core_temps[@]}
+logical_cores=$(nproc)
+
+mem_line=$(awk '/^MemTotal:/ {total=$2} /^MemAvailable:/ {available=$2} END {print total, available}' /proc/meminfo)
+read -r mem_total mem_available <<<"$mem_line"
+swap_line=$(awk '/^SwapTotal:/ {total=$2} /^SwapFree:/ {free=$2} END {print total, free}' /proc/meminfo)
+read -r swap_total swap_free <<<"$swap_line"
+disk_line=$(df -P -B1 / | awk 'NR==2 {gsub(/%/, "", $5); print $3, $2, $5}')
+read -r disk_used disk_total disk_percent <<<"$disk_line"
+
+printf 'cpu|%s|%s\n' "$cpu_total" "$cpu_idle"
+printf 'memory|%s|%s\n' "$mem_total" "$mem_available"
+printf 'swap|%s|%s\n' "$swap_total" "$swap_free"
+printf 'disk|%s|%s|%s\n' "$disk_used" "$disk_total" "$disk_percent"
+read -r load1 load5 load15 _ < /proc/loadavg
+printf 'load|%s|%s|%s\n' "$load1" "$load5" "$load15"
+uptime_seconds=$(awk '{print int($1)}' /proc/uptime)
+printf 'uptime|%s\n' "$uptime_seconds"
+
+if (( physical_cores > 0 && logical_cores % physical_cores == 0 )); then
+  awk -v phys="$physical_cores" '
+    /^cpu[0-9]+ / {
+      idx = substr($1, 4) + 0
+      total = $2+$3+$4+$5+$6+$7+$8
+      idle = $5+$6
+      printf "core|%d|%s|%s|%d\n", idx, total, idle, idx % phys
+    }
+  ' /proc/stat | while IFS='|' read -r tag idx total idle physidx; do
+    printf 'core|%s|%s|%s|%s\n' "$idx" "$total" "$idle" "${core_temps[$physidx]:--1}"
+  done
+else
+  awk '/^cpu[0-9]+ / { idx = substr($1, 4) + 0; total = $2+$3+$4+$5+$6+$7+$8; idle = $5+$6; printf "core|%d|%s|%s|-1\n", idx, total, idle }' /proc/stat
+fi
+ps -eo comm=,%cpu=,%mem= --sort=-%cpu | awk 'NR <= 5 {cpu=$(NF-1); mem=$NF; name=$1; for (i=2; i<=NF-2; i++) name=name " " $i; gsub(/^ +| +$/, "", name); printf "process|%s|%s|%s\n", name, cpu, mem}'
