@@ -9,6 +9,8 @@
 #   ./install.sh nvim hypr    — instala múltiplos
 #
 # Módulos disponíveis:
+#   bash            → ~/.bashrc
+#   git             → ~/.config/git/ (config + hooks)
 #   nvim            → ~/.config/nvim/
 #   omarchy-hooks   → ~/.config/omarchy/hooks/
 #   hypr            → ~/.config/hypr/ (bindings + windowrules)
@@ -24,7 +26,7 @@
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STOW_MODULES=(nvim omarchy-hooks hypr bin systemd)
+STOW_MODULES=(bash git nvim omarchy-hooks hypr bin systemd)
 OBSIDIAN_MODULE="obsidian"
 
 # ── Verificar dependências ────────────────────────────────────────

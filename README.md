@@ -9,6 +9,8 @@ Temas baseados na paleta **Cimarrão** (dark) e **Tererê** (light).
 
 | Módulo | Destino | O que é |
 |--------|---------|---------|
+| `bash` | `~/.bashrc` | Aliases, funções e init do shell (atuin, direnv, bash-preexec). Nada de trabalho — sourceia `~/.config/amphora/work.sh` se existir |
+| `git` | `~/.config/git/` | Config global (delta como pager, rerere, rebase no pull) + hook `post-commit` |
 | `nvim` | `~/.config/nvim/` | Config completa do Neovim (LazyVim + plugins + temas) |
 | `omarchy-themes` | `~/.config/omarchy/themes/` | Temas Yerba Mate (dark) e Tererê (light) para o Omarchy |
 | `omarchy-hooks` | `~/.config/omarchy/hooks/` | Hook que sincroniza tema do Claude Code com o Omarchy |
@@ -98,14 +100,9 @@ playwright install chromium   # ~650MB em ~/.cache/ms-playwright
 
 ### Config manual necessária
 
-Duas instalam inertes:
-
 - **`delta`** — já configurado no módulo `git` (`core.pager`, `interactive.diffFilter`).
   Vem junto com `./install.sh git`.
-- **`direnv`** — precisa do hook no shell, **e o `.bashrc` não é rastreado aqui**:
-  ```bash
-  echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
-  ```
+- **`direnv`** — hook já incluído no módulo `bash`. Vem com `./install.sh bash`.
 
 `podman` rootless precisa de `subuid`/`subgid` (o Arch já cria no install do pacote):
 
