@@ -12,11 +12,20 @@
 #   bash            → ~/.bashrc
 #   git             → ~/.config/git/ (config + hooks)
 #   nvim            → ~/.config/nvim/
+#   alacritty       → ~/.config/alacritty/
+#   ghostty         → ~/.config/ghostty/
+#   tmux            → ~/.config/tmux/
+#   lazygit         → ~/.config/lazygit/
+#   starship        → ~/.config/starship.toml
+#   fastfetch       → ~/.config/fastfetch/
 #   omarchy-hooks   → ~/.config/omarchy/hooks/
 #   hypr            → ~/.config/hypr/ (bindings + windowrules)
 #   bin             → ~/.local/bin/ (daily-note, omarchy-theme-auto)
 #   systemd         → ~/.config/systemd/user/ (timer troca automática de tema)
 #   obsidian        → instala tema no vault (requer OBSIDIAN_VAULT)
+#
+# Nao instalados (destino nao existe nesta maquina — Omarchy 4 substituiu):
+#   mako, newsboat, walker, waybar
 #
 # Temas Omarchy são instalados diretamente dos repos públicos:
 #   github.com/nfvelten/omarchy-yerba-mate  → dark
@@ -26,7 +35,8 @@
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STOW_MODULES=(bash git nvim omarchy-hooks hypr bin systemd)
+STOW_MODULES=(bash git nvim omarchy-hooks hypr bin systemd \
+               alacritty ghostty tmux lazygit starship fastfetch)
 OBSIDIAN_MODULE="obsidian"
 
 # ── Verificar dependências ────────────────────────────────────────

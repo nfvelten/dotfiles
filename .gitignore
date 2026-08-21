@@ -7,3 +7,4 @@ Thumbs.db
 
 # Backgrounds (imagens pesadas, não versionadas)
 omarchy-themes/.config/omarchy/themes/*/backgrounds/
+nvim/.config/nvim/lua/plugins/theme.lua
