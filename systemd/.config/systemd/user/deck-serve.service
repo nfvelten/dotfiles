@@ -1,0 +1,13 @@
+[Unit]
+Description=Deck HTTP bridge (notify + approve proxy)
+After=network-online.target tailscaled.service
+
+[Service]
+Type=simple
+ExecStart=/home/nfvelten/.local/bin/deck serve
+Restart=on-failure
+RestartSec=5
+Environment=PATH=/home/nfvelten/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

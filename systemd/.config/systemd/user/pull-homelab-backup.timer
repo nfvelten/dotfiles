@@ -1,0 +1,10 @@
+[Unit]
+Description=Puxa backup do homelab diariamente
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+Persistent=true
+RandomizedDelaySec=20m
+
+[Install]
+WantedBy=timers.target

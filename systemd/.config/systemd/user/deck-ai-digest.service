@@ -1,0 +1,9 @@
+[Unit]
+Description=Deck AI vault digest
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/deck ai digest
+StandardOutput=journal
+StandardError=journal

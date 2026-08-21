@@ -4,7 +4,7 @@
 # light.mode existe → tema claro, senão → tema escuro
 
 CLAUDE_JSON="$HOME/.claude.json"
-LIGHT_MODE="$HOME/.config/omarchy/current/theme/light.mode"
+LIGHT_MODE="$HOME/.local/state/omarchy/current/theme/light.mode"
 
 if [[ ! -f "$CLAUDE_JSON" ]]; then
   exit 0

@@ -1,0 +1,8 @@
+[Unit]
+Description=Deck phone monitor push
+
+[Service]
+Type=oneshot
+ExecStart=/home/nfvelten/.local/bin/deck phone push-status
+ExecStartPost=/home/nfvelten/.local/bin/deck phone push-contabo
+Environment=PATH=/home/nfvelten/.local/bin:/usr/local/bin:/usr/bin:/bin

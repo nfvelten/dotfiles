@@ -1,0 +1,7 @@
+[Unit]
+Description=Backup de configs pessoais fora do $HOME (/etc), espelhado no homelab
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/etc-config-snapshot

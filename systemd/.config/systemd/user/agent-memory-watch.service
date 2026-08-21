@@ -1,0 +1,15 @@
+[Unit]
+Description=agent-memory vault watcher — reindex on change
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/nfvelten/code/agent-memory/bin/agent-memory-watch
+Restart=on-failure
+RestartSec=5
+Environment=AGENT_MEMORY_VAULT=/home/nfvelten/amphora
+Environment=AGENT_MEMORY_WORKS=/home/nfvelten/code/work:/home/nfvelten/code/personal
+Environment=AGENT_MEMORY_INDEX=/home/nfvelten/amphora/.agent-memory/index
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=Snapshot dos pacotes instalados (pacman+AUR), espelhado no homelab
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/pkglist-snapshot

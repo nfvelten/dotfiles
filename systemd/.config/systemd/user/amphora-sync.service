@@ -11,3 +11,8 @@ ExecStart=/bin/bash -c '\
   git diff --cached --quiet || \
   git commit -m "vault backup: $(date +%%Y-%%m-%%d\ %%H:%%M:%%S)" && \
   git push origin master 2>/dev/null || git push origin main'
+ExecStartPost=/bin/bash -c '\
+  ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=no \
+    -p 8022 -i %h/.ssh/termux_moto_g7 nfvelten@100.85.237.86 \
+    "git -C ~/storage/shared/Documents/amphora pull --ff-only" \
+  2>&1 || true'

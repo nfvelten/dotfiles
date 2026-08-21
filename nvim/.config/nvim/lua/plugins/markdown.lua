@@ -2,6 +2,17 @@
 -- remove da fila do mason para evitar erro de instalação duplicada
 return {
   {
+    "MeanderingProgrammer/render-markdown.nvim",
+    dependencies = { "nvim-treesitter/nvim-treesitter", "nvim-tree/nvim-web-devicons" },
+    opts = {
+      heading = {
+        position = "inline",
+        icons = { "󰲡 ", "󰲣 ", "󰲥 ", "󰲧 ", "󰲩 ", "󰲫 " },
+      },
+    },
+    ft = { "markdown" },
+  },
+  {
     "mason-org/mason.nvim",
     opts = function(_, opts)
       opts.ensure_installed = vim.tbl_filter(function(tool)

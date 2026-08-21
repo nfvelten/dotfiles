@@ -1,0 +1,6 @@
+[Unit]
+Description=Amphora Routine — sample active window while focusing
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/deck focus sample

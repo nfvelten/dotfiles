@@ -1,0 +1,7 @@
+[Unit]
+Description=Espelha os backups de config do homelab (via Tailscale)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/pull-homelab-backup

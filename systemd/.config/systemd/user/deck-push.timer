@@ -1,0 +1,10 @@
+[Unit]
+Description=Push deck status to phone every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=deck-push.service
+
+[Install]
+WantedBy=timers.target

@@ -4,7 +4,7 @@
 
 LIGHT_THEME="terere"
 DARK_THEME="yerba-mate"
-CURRENT_THEME=$(cat "$HOME/.config/omarchy/current/theme.name" 2>/dev/null)
+CURRENT_THEME=$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)
 HOUR=$(date +%-H)
 
 if (( HOUR >= 6 && HOUR < 18 )); then

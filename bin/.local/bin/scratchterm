@@ -1,6 +1,8 @@
 #!/bin/bash
 if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:scratchterm")' > /dev/null 2>&1; then
-    hyprctl dispatch togglespecialworkspace scratchterm
+    hyprctl dispatch "hl.dsp.workspace.toggle_special(\"scratchterm\")"
 else
-    hyprctl dispatch exec "[workspace special:scratchterm silent;float;size 1000 580;center] ghostty"
+    hyprctl dispatch "hl.dsp.exec_cmd(\"ghostty --title=__scratchterm\")"
+    sleep 0.5
+    hyprctl dispatch "hl.dsp.workspace.toggle_special(\"scratchterm\")"
 fi
