@@ -30,6 +30,12 @@ Item {
   property bool dirty: false
   property string status: ""
 
+  // Rendering markdown costs roughly the size of the note, and a Text item
+  // fed a megabyte draws nothing at all rather than drawing slowly. The vault
+  // has one note past this mark; everything else renders whole.
+  readonly property int previewLimit: 200000
+  readonly property bool oversized: draft.length > previewLimit
+
   readonly property string home: Quickshell.env("HOME") || ""
   readonly property string resolvedVault: vaultPath !== "" ? vaultPath : home + "/amphora"
 
@@ -421,7 +427,9 @@ Item {
                 Button {
                   id: modeButton
                   text: root.editing ? "Ler  Ctrl+E" : "Editar  Ctrl+E"
-                  enabled: root.currentPath !== ""
+                  // Editing an oversized note would mean loading it whole into
+                  // a TextArea and risking a save that writes back the recorte.
+                  enabled: root.currentPath !== "" && !root.oversized
                   onClicked: {
                     if (root.editing) root.saveDraft()
                     root.editing = !root.editing
@@ -432,10 +440,25 @@ Item {
 
               PanelSeparator { width: parent.width }
 
+              Text {
+                id: oversizedNotice
+                width: parent.width
+                visible: root.oversized
+                text: "Nota grande (" + Math.round(root.draft.length / 1024)
+                  + " KB). Mostrando os primeiros "
+                  + Math.round(root.previewLimit / 1024)
+                  + " KB — edição desabilitada para não truncar o arquivo."
+                wrapMode: Text.Wrap
+                color: Color.urgent
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+              }
+
               ScrollView {
                 width: parent.width
-                height: parent.height - noteHeader.height - parent.spacing * 3
-                  - Style.space(1)
+                height: parent.height - noteHeader.height - Style.space(1)
+                  - (root.oversized ? oversizedNotice.implicitHeight + parent.spacing : 0)
+                  - parent.spacing * 3
                 clip: true
 
                 // Reading renders the markdown; editing shows it raw, so the
@@ -443,7 +466,7 @@ Item {
                 Text {
                   visible: !root.editing
                   width: parent.width
-                  text: root.draft
+                  text: root.oversized ? root.draft.slice(0, root.previewLimit) : root.draft
                   textFormat: Text.MarkdownText
                   wrapMode: Text.Wrap
                   color: Color.foreground
