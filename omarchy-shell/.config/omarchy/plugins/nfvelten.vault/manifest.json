@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "id": "nfvelten.vault",
+  "name": "Vault",
+  "version": "0.1.0",
+  "author": "nfvelten",
+  "license": "MIT",
+  "description": "Recent notes from the Obsidian vault, read and edited in a native window.",
+  "kinds": [
+    "bar-widget",
+    "panel"
+  ],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "panel": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Vault",
+    "description": "Recent notes from the Obsidian vault, read and edited in a native window.",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "defaults": {
+      "vaultPath": "",
+      "recentCount": 40,
+      "captureHeading": "Quick Notes"
+    },
+    "schema": [
+      {
+        "key": "vaultPath",
+        "type": "string",
+        "label": "Vault folder",
+        "defaultValue": "",
+        "description": "Absolute path to the vault. Leave empty for ~/amphora."
+      },
+      {
+        "key": "recentCount",
+        "type": "integer",
+        "label": "Recent notes to list",
+        "min": 5,
+        "max": 200,
+        "step": 5,
+        "defaultValue": 40
+      },
+      {
+        "key": "captureHeading",
+        "type": "string",
+        "label": "Quick capture heading",
+        "defaultValue": "Quick Notes",
+        "description": "Section of today's daily note that quick captures are appended to."
+      }
+    ]
+  }
+}
