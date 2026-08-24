@@ -19,3 +19,12 @@ scratch_rule("__scratchwork", "work-nvim", "1100 650")
 scratch_rule("__scratchikhal", "ikhal", "1100 650")
 scratch_rule("__scratchspotify", "spotify", "1100 650")
 scratch_rule("__scratchkeys", "keys", "1100 650")
+
+-- Painel do plugin nfvelten.vault: FloatingWindow do quickshell, que o
+-- Hyprland tilaria por padrão. Casa pelo title porque a class
+-- (org.quickshell) é compartilhada com os outros painéis do shell.
+o.window({ title = "^(Vault)$" }, {
+  float = true,
+  size = "1020 700",
+  center = true,
+})
