@@ -230,6 +230,10 @@ Item {
           BorderSurface {
             width: Style.space(280)
             height: parent.height
+            // Rectangle defaults to white; both surfaces take the kit's fill
+            // and border so they sit on the theme instead of punching a hole.
+            color: Style.normalFillFor(root.foreground, root.foreground)
+            borderSpec: Border.controlSpec("normal", root.foreground, root.foreground)
 
             ListView {
               id: noteList
@@ -263,6 +267,8 @@ Item {
           BorderSurface {
             width: parent.width - Style.space(280) - parent.spacing
             height: parent.height
+            color: Style.normalFillFor(root.foreground, root.foreground)
+            borderSpec: Border.controlSpec("normal", root.foreground, root.foreground)
 
             Column {
               anchors.fill: parent
@@ -331,7 +337,6 @@ Item {
                   textFormat: Text.MarkdownText
                   wrapMode: Text.Wrap
                   color: root.foreground
-                  linkColor: root.foreground
                   font.family: Style.font.family
                   font.pixelSize: Style.font.body
                   onLinkActivated: function(link) { Qt.openUrlExternally(link) }
