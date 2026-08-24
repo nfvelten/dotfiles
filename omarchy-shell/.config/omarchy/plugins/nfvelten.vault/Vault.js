@@ -143,3 +143,99 @@ function appendUnderHeading(text, heading, entry) {
   lines.splice(end, 0, line)
   return lines.join("\n")
 }
+
+// ---------------------------------------------------------------- rendering
+
+// YAML frontmatter is metadata, not prose: it is lifted out of the body and
+// shown as a header instead of being dumped as text at the top of the note.
+function splitFrontmatter(text) {
+  var body = String(text || "")
+  if (body.slice(0, 4) !== "---\n") return { fields: {}, body: body }
+  var end = body.indexOf("\n---", 3)
+  if (end === -1) return { fields: {}, body: body }
+  var head = body.slice(4, end)
+  var rest = body.slice(end + 4)
+  while (rest.charAt(0) === "\n") rest = rest.slice(1)
+
+  var fields = ({})
+  var lines = head.split("\n")
+  var lastKey = ""
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i]
+    if (line.trim() === "") continue
+    // `- item` continues the previous key's list.
+    var listItem = line.match(/^\s*-\s+(.*)$/)
+    if (listItem && lastKey) {
+      fields[lastKey] = (fields[lastKey] ? fields[lastKey] + ", " : "") + listItem[1].trim()
+      continue
+    }
+    var pair = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/)
+    if (!pair) continue
+    lastKey = pair[1]
+    fields[lastKey] = pair[2].trim()
+  }
+  return { fields: fields, body: rest }
+}
+
+function frontmatterTags(fields) {
+  var raw = fields && (fields.tags || fields.tag)
+  if (!raw) return []
+  return String(raw)
+    .replace(/[\[\]]/g, "")
+    .split(",")
+    .map(function(t) { return t.trim().replace(/^#/, "") })
+    .filter(function(t) { return t !== "" })
+}
+
+// `[[note]]` and `[[note|alias]]` become real markdown links so Qt renders
+// them as anchors and onLinkActivated can route them back into the vault.
+// Fenced code blocks are left alone — a wikilink inside one is sample text.
+function linkifyWikilinks(text, color) {
+  var body = String(text || "")
+  var parts = body.split(
+    /(```[\s\S]*?```|`[^`\n]*`|\[[^\]]*\]\([^)]*\)|<a[\s\S]*?<\/a>)/)
+  for (var i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) continue
+    parts[i] = parts[i].replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
+      function(match, target, alias) {
+        var name = target.trim()
+        var label = (alias || target).trim()
+        if (!color) return "[" + label + "](vault://" + encodeURIComponent(name) + ")"
+        // Qt ignores Text.linkColor for MarkdownText, so the colour has to
+        // ride along inside the anchor itself.
+        return "<a href=\"vault://" + encodeURIComponent(name)
+          + "\" style=\"color:" + color + ";\">" + label + "</a>"
+      })
+    // Bare URLs are autolinked by Qt with its own blue; colour them here so
+    // every link in the note reads as one.
+    if (color) {
+      parts[i] = parts[i].replace(/(^|[\s(])(https?:\/\/[^\s<>)\]]+)/g,
+        function(match, lead, url) {
+          return lead + "<a href=\"" + url + "\" style=\"color:" + color
+            + ";\">" + url + "</a>"
+        })
+    }
+  }
+  return parts.join("")
+}
+
+function wikilinkTarget(url) {
+  var link = String(url || "")
+  if (link.slice(0, 8) !== "vault://") return ""
+  try { return decodeURIComponent(link.slice(8)) } catch (e) { return link.slice(8) }
+}
+
+// Resolve a wikilink name against the note index. Exact title first, then a
+// case-insensitive match, so `[[carreira]]` still finds `Carreira`.
+function resolveNote(name, notes) {
+  var wanted = String(name || "").trim()
+  if (wanted === "" || !notes) return ""
+  var lower = wanted.toLowerCase()
+  var fallback = ""
+  for (var i = 0; i < notes.length; i++) {
+    var title = notes[i].title
+    if (title === wanted) return notes[i].path
+    if (!fallback && String(title).toLowerCase() === lower) fallback = notes[i].path
+  }
+  return fallback
+}

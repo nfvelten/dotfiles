@@ -23,6 +23,9 @@ Item {
   property string captureHeading: "Quick Notes"
   readonly property string resolvedVault: vaultPath !== "" ? vaultPath : home + "/amphora"
 
+  // Every note in the vault, used to resolve wikilinks by title. Cheap to
+  // hold: the listing already walked the whole tree.
+  property var index: []
   property var recent: []
   property var notes: []
   property var recentMtimes: ({})
@@ -77,9 +80,11 @@ Item {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var parsed = Vault.parseListing(text, root.resolvedVault, root.recentCount)
+        var all = Vault.parseListing(text, root.resolvedVault, 0)
+        var parsed = all.slice(0, root.recentCount)
+        root.index = all
         root.recent = parsed
-        root.recentMtimes = Vault.mtimeMap(parsed)
+        root.recentMtimes = Vault.mtimeMap(all)
         if (root.query.trim() === "") root.notes = parsed
       }
     }
@@ -103,6 +108,10 @@ Item {
   }
 
   // ------------------------------------------------------- daily + capture
+
+  function resolveNote(name) {
+    return Vault.resolveNote(name, index)
+  }
 
   function dailyPath() {
     return resolvedVault + "/" + Vault.dailyNotePath(new Date())

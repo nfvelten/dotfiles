@@ -35,6 +35,14 @@ Item {
 
   readonly property var notes: service ? service.notes : []
 
+  // Frontmatter is lifted out of the prose and drawn as a header; wikilinks
+  // become anchors so they can be followed.
+  readonly property var parsed: Vault.splitFrontmatter(draft)
+  readonly property var noteTags: Vault.frontmatterTags(parsed.fields)
+  readonly property string rendered: Vault.linkifyWikilinks(
+    oversized ? parsed.body.slice(0, previewLimit) : parsed.body,
+    String(foreground))
+
   // ------------------------------------------------------------- lifecycle
 
   function open(payloadJson) {
@@ -123,6 +131,18 @@ Item {
     id: autosave
     interval: 1500
     onTriggered: root.saveDraft()
+  }
+
+  // A vault:// link is a wikilink; anything else belongs to the browser. An
+  // unresolved name is reported instead of failing silently, since a broken
+  // link usually means the note has not been written yet.
+  function followLink(link) {
+    var name = Vault.wikilinkTarget(link)
+    if (name === "") { Qt.openUrlExternally(link); return }
+    var path = service ? service.resolveNote(name) : ""
+    if (path !== "") { selectPath(path); return }
+    status = "Nota não encontrada: " + name
+    statusTimer.restart()
   }
 
   function openDailyNote() {
@@ -310,6 +330,35 @@ Item {
                 }
               }
 
+              // Frontmatter tags, drawn as chips instead of raw YAML.
+              Flow {
+                id: tagRow
+                width: parent.width
+                visible: root.noteTags.length > 0
+                spacing: Style.space(6)
+
+                Repeater {
+                  model: root.noteTags
+
+                  BorderSurface {
+                    required property string modelData
+                    implicitWidth: tagText.implicitWidth + Style.space(14)
+                    implicitHeight: tagText.implicitHeight + Style.space(6)
+                    color: Util.alpha(root.foreground, 0.06)
+                    borderSpec: Border.controlSpec("normal", root.foreground, root.foreground)
+
+                    Text {
+                      id: tagText
+                      anchors.centerIn: parent
+                      text: "#" + parent.modelData
+                      color: root.secondary
+                      font.family: Style.font.family
+                      font.pixelSize: Style.font.caption
+                    }
+                  }
+                }
+              }
+
               PanelSeparator { width: parent.width }
 
               Text {
@@ -333,6 +382,7 @@ Item {
                 id: contentArea
                 width: parent.width
                 height: parent.height - noteHeader.height - Style.space(1)
+                  - (root.noteTags.length > 0 ? tagRow.implicitHeight + parent.spacing : 0)
                   - (root.oversized ? oversizedNotice.implicitHeight + parent.spacing : 0)
                   - parent.spacing * 3
 
@@ -342,14 +392,25 @@ Item {
                   clip: true
 
                   Text {
+                    // Cap the measure with padding rather than anchors: a
+                    // ScrollView drives its content item's geometry, and
+                    // anchoring inside one collapses the child to nothing.
                     width: contentArea.width
-                    text: root.oversized ? root.draft.slice(0, root.previewLimit) : root.draft
+                    leftPadding: Style.space(12)
+                    rightPadding: Math.max(Style.space(12),
+                      contentArea.width - Style.space(760))
+                    topPadding: Style.space(4)
+                    bottomPadding: Style.space(24)
+                    text: root.rendered
                     textFormat: Text.MarkdownText
                     wrapMode: Text.Wrap
                     color: root.foreground
                     font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    onLinkActivated: function(link) { Qt.openUrlExternally(link) }
+                    font.pixelSize: Style.font.subtitle
+                    linkColor: root.foreground
+                    lineHeight: 1.35
+                    lineHeightMode: Text.ProportionalHeight
+                    onLinkActivated: function(link) { root.followLink(link) }
                   }
                 }
 
