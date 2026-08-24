@@ -69,6 +69,11 @@ Item {
     if (currentPath === "" && notes.length > 0) selectPath(notes[0].path)
   }
 
+  // The editor takes the draft on entry rather than binding to it: the binding
+  // would be broken by the first keystroke anyway, since typing writes back
+  // into draft.
+  onEditingChanged: if (editing) editor.text = draft
+
   // ------------------------------------------------------------------ notes
 
   function selectPath(path) {
@@ -154,8 +159,8 @@ Item {
     visible: root.opened
     title: "Vault"
     color: Color.background
-    implicitWidth: 1020
-    implicitHeight: 700
+    implicitWidth: 1100
+    implicitHeight: 650
     minimumSize: Qt.size(720, 480)
 
     onVisibleChanged: if (!visible && root.opened) root.requestClose()
@@ -321,44 +326,55 @@ Item {
                 font.pixelSize: Style.font.caption
               }
 
-              ScrollView {
+              // One ScrollView per mode. A ScrollView adopts a single child
+              // as its content item, so keeping the reader and the editor in
+              // the same one left the editor unmanaged and scrolled adrift.
+              Item {
+                id: contentArea
                 width: parent.width
                 height: parent.height - noteHeader.height - Style.space(1)
                   - (root.oversized ? oversizedNotice.implicitHeight + parent.spacing : 0)
                   - parent.spacing * 3
-                clip: true
 
-                // Reading renders the markdown; editing shows it raw, so the
-                // syntax being typed is the syntax on screen.
-                Text {
+                ScrollView {
+                  anchors.fill: parent
                   visible: !root.editing
-                  width: parent.width
-                  text: root.oversized ? root.draft.slice(0, root.previewLimit) : root.draft
-                  textFormat: Text.MarkdownText
-                  wrapMode: Text.Wrap
-                  color: root.foreground
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.body
-                  onLinkActivated: function(link) { Qt.openUrlExternally(link) }
+                  clip: true
+
+                  Text {
+                    width: contentArea.width
+                    text: root.oversized ? root.draft.slice(0, root.previewLimit) : root.draft
+                    textFormat: Text.MarkdownText
+                    wrapMode: Text.Wrap
+                    color: root.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                    onLinkActivated: function(link) { Qt.openUrlExternally(link) }
+                  }
                 }
 
-                TextArea {
-                  id: editor
+                ScrollView {
+                  anchors.fill: parent
                   visible: root.editing
-                  width: parent.width
-                  text: root.draft
-                  wrapMode: TextEdit.Wrap
-                  color: root.foreground
-                  selectionColor: Util.alpha(root.foreground, 0.25)
-                  selectedTextColor: root.foreground
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.body
-                  background: null
-                  onTextChanged: {
-                    if (!root.editing || text === root.draft) return
-                    root.draft = text
-                    root.dirty = true
-                    autosave.restart()
+                  clip: true
+
+                  // Raw markdown while editing, so the syntax being typed is
+                  // the syntax on screen.
+                  TextArea {
+                    id: editor
+                    wrapMode: TextEdit.Wrap
+                    color: root.foreground
+                    selectionColor: Util.alpha(root.foreground, 0.25)
+                    selectedTextColor: root.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                    background: null
+                    onTextChanged: {
+                      if (!root.editing || text === root.draft) return
+                      root.draft = text
+                      root.dirty = true
+                      autosave.restart()
+                    }
                   }
                 }
               }
