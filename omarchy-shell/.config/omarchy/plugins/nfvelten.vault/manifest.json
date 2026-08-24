@@ -7,11 +7,13 @@
   "license": "MIT",
   "description": "Recent notes from the Obsidian vault, read and edited in a native window.",
   "kinds": [
+    "service",
     "bar-widget",
     "panel"
   ],
   "activation": "on-demand",
   "entryPoints": {
+    "service": "Service.qml",
     "barWidget": "BarWidget.qml",
     "panel": "Panel.qml"
   },

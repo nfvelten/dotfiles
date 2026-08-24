@@ -12,16 +12,8 @@ Item {
 
   property var shell: null
   property var manifest: null
+  property var service: null
   property bool opened: false
-
-  property string vaultPath: ""
-  property int recentCount: 40
-  property string captureHeading: "Quick Notes"
-
-  property var notes: []
-  property var recentMtimes: ({})
-  property string searchText: ""
-  property bool searching: false
 
   property string currentPath: ""
   property string currentTitle: ""
@@ -30,26 +22,36 @@ Item {
   property bool dirty: false
   property string status: ""
 
-  // Rendering markdown costs roughly the size of the note, and a Text item
-  // fed a megabyte draws nothing at all rather than drawing slowly. The vault
-  // has one note past this mark; everything else renders whole.
+  // One hue, two weights. Anything secondary is the same foreground at lower
+  // opacity — never a second colour.
+  readonly property color foreground: Color.foreground
+  readonly property color secondary: Util.alpha(foreground, 0.55)
+
+  // Rendering markdown costs roughly the size of the note, and a Text item fed
+  // a megabyte draws nothing at all rather than drawing slowly. The vault has
+  // one note past this mark; everything else renders whole.
   readonly property int previewLimit: 200000
   readonly property bool oversized: draft.length > previewLimit
 
-  readonly property string home: Quickshell.env("HOME") || ""
-  readonly property string resolvedVault: vaultPath !== "" ? vaultPath : home + "/amphora"
+  readonly property var notes: service ? service.notes : []
 
   // ------------------------------------------------------------- lifecycle
 
   function open(payloadJson) {
     var payload = ({})
     try { if (payloadJson) payload = JSON.parse(payloadJson) } catch (e) {}
-    applySettings(payload)
+    if (service) {
+      service.applySettings(payload.settings)
+      service.refresh()
+    }
     opened = true
-    refresh()
-    if (payload.capture === true) Qt.callLater(function() { captureField.forceActiveFocus() })
-    else Qt.callLater(function() { searchField.forceActiveFocus() })
-    if (payload.today === true) Qt.callLater(function() { root.openDailyNote() })
+
+    if (typeof payload.path === "string" && payload.path !== "")
+      selectPath(payload.path)
+    else if (payload.today === true) openDailyNote()
+    else if (currentPath === "" && notes.length > 0) selectPath(notes[0].path)
+
+    Qt.callLater(function() { searchField.forceActiveFocus() })
   }
 
   function close() {
@@ -63,77 +65,19 @@ Item {
     else close()
   }
 
-  function applySettings(payload) {
-    var s = payload && payload.settings ? payload.settings : {}
-    if (typeof s.vaultPath === "string" && s.vaultPath !== "") vaultPath = s.vaultPath
-    var count = Number(s.recentCount)
-    if (isFinite(count) && count > 0) recentCount = Math.round(count)
-    if (typeof s.captureHeading === "string" && s.captureHeading !== "")
-      captureHeading = s.captureHeading
-  }
-
-  // ---------------------------------------------------------------- listing
-
-  function refresh() {
-    if (searchText.trim() !== "") runSearch()
-    else listProcess.running = true
-  }
-
-  Process {
-    id: listProcess
-    running: false
-    command: ["find", root.resolvedVault, "-type", "f", "-name", "*.md",
-      "-not", "-path", "*/.*", "-printf", "%T@\t%p\n"]
-
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var parsed = Vault.parseListing(text, root.resolvedVault, root.recentCount)
-        root.notes = parsed
-        root.recentMtimes = Vault.mtimeMap(parsed)
-        if (root.currentPath === "" && parsed.length > 0) root.selectNote(parsed[0])
-      }
-    }
-  }
-
-  Process {
-    id: searchProcess
-    running: false
-    command: ["rg", "--files-with-matches", "--smart-case", "--glob", "*.md",
-      "--", root.searchText, root.resolvedVault]
-
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        root.searching = false
-        root.notes = Vault.parseSearch(text, root.resolvedVault, root.recentMtimes)
-      }
-    }
-    // rg exits 1 on "no matches", which is not an error worth surfacing.
-    onExited: root.searching = false
-  }
-
-  function runSearch() {
-    if (searchProcess.running) return
-    searching = true
-    searchProcess.running = true
-  }
-
-  Timer {
-    id: searchDebounce
-    interval: 180
-    onTriggered: root.refresh()
+  onNotesChanged: {
+    if (currentPath === "" && notes.length > 0) selectPath(notes[0].path)
   }
 
   // ------------------------------------------------------------------ notes
 
-  function selectNote(note) {
-    if (!note || !note.path) return
+  function selectPath(path) {
+    if (!path || path === currentPath) return
     if (dirty) saveDraft()
-    currentPath = note.path
-    currentTitle = note.title
+    currentPath = path
+    currentTitle = Vault.noteTitle(path)
     editing = false
-    noteFile.path = note.path
+    noteFile.path = path
   }
 
   FileView {
@@ -142,8 +86,8 @@ Item {
     printErrors: false
 
     onLoaded: {
-      // A change on disk while editing would silently discard the draft, so
-      // an in-progress edit keeps what the user typed.
+      // A change on disk while editing would silently discard the draft, so an
+      // in-progress edit keeps what the user typed.
       if (root.editing && root.dirty) return
       root.draft = text()
       root.dirty = false
@@ -155,7 +99,7 @@ Item {
   }
 
   function saveDraft() {
-    if (!dirty || currentPath === "") return
+    if (!dirty || currentPath === "" || oversized) return
     noteFile.setText(draft)
     dirty = false
     status = "Salvo"
@@ -168,55 +112,24 @@ Item {
     onTriggered: root.status = ""
   }
 
-  // ------------------------------------------------------- daily + capture
-
-  function dailyPath() {
-    return resolvedVault + "/" + Vault.dailyNotePath(new Date())
+  // Autosave keeps the vault's own minute-by-minute git commits meaningful
+  // without needing Ctrl+S after every keystroke.
+  Timer {
+    id: autosave
+    interval: 1500
+    onTriggered: root.saveDraft()
   }
 
   function openDailyNote() {
-    var path = dailyPath()
-    selectNote({ path: path, title: Vault.noteTitle(path) })
+    if (service) selectPath(service.dailyPath())
   }
 
-  function capture(entry) {
-    var body = entry.trim()
-    if (body === "") return
-    captureFile.path = dailyPath()
-    pendingCapture = body
-    // The write happens in onLoaded/onLoadFailed: the section can only be
-    // found once the note is in hand.
-    captureFile.reload()
-  }
-
-  property string pendingCapture: ""
-
-  FileView {
-    id: captureFile
-    watchChanges: false
-    printErrors: false
-
-    onLoaded: root.writeCapture(text())
-    onLoadFailed: root.writeCapture("")
-  }
-
-  function writeCapture(existing) {
-    if (pendingCapture === "") return
-    var next = Vault.appendUnderHeading(existing, captureHeading, pendingCapture)
-    captureFile.setText(next)
-    pendingCapture = ""
-    status = "Capturado na daily note"
-    statusTimer.restart()
-    captureField.text = ""
-    refreshDebounce.restart()
-    // Editing the note that is open on the right: pull the new text in.
-    if (currentPath === captureFile.path) noteFile.reload()
-  }
-
-  Timer {
-    id: refreshDebounce
-    interval: 300
-    onTriggered: root.refresh()
+  Connections {
+    target: root.service
+    ignoreUnknownSignals: true
+    function onNoteWritten(path) {
+      if (path === root.currentPath) noteFile.reload()
+    }
   }
 
   // ------------------------------------------------------------------- IPC
@@ -224,18 +137,13 @@ Item {
   IpcHandler {
     target: "nfvelten.vault"
 
-    function toggle(): void {
-      if (root.shell && typeof root.shell.toggle === "function")
-        root.shell.toggle("nfvelten.vault", "{}")
-    }
     function today(): void {
       if (root.shell && typeof root.shell.summon === "function")
         root.shell.summon("nfvelten.vault", JSON.stringify({ today: true }))
     }
     function capture(text: string): string {
-      if (String(text || "").trim() === "") return "empty"
-      root.capture(String(text))
-      return "ok"
+      if (!root.service) return "unavailable"
+      return root.service.capture(text) ? "ok" : "empty"
     }
   }
 
@@ -261,7 +169,7 @@ Item {
           root.saveDraft()
           event.accepted = true
         } else if (event.key === Qt.Key_E && (event.modifiers & Qt.ControlModifier)) {
-          root.editing = !root.editing
+          if (!root.oversized) root.editing = !root.editing
           event.accepted = true
         } else if (event.key === Qt.Key_Escape) {
           if (root.editing) { root.saveDraft(); root.editing = false }
@@ -285,30 +193,31 @@ Item {
             id: searchField
             width: parent.width - todayButton.width - captureField.width
               - captureButton.width - parent.spacing * 3
+            foreground: root.foreground
             placeholderText: "Buscar no vault…"
-            onTextChanged: {
-              root.searchText = text
-              searchDebounce.restart()
-            }
+            onTextChanged: if (root.service) root.service.setQuery(text)
           }
 
           Button {
             id: todayButton
             text: "Hoje"
+            foreground: root.foreground
             onClicked: root.openDailyNote()
           }
 
           TextField {
             id: captureField
             width: Style.space(260)
+            foreground: root.foreground
             placeholderText: "Captura rápida…"
-            onAccepted: root.capture(text)
+            onAccepted: root.doCapture()
           }
 
           Button {
             id: captureButton
             text: "Capturar"
-            onClicked: root.capture(captureField.text)
+            foreground: root.foreground
+            onClicked: root.doCapture()
           }
         }
 
@@ -328,73 +237,24 @@ Item {
               anchors.margins: Style.space(4)
               clip: true
               model: root.notes
-              currentIndex: -1
 
-              delegate: Rectangle {
+              delegate: NoteRow {
                 required property var modelData
                 width: noteList.width
-                height: Style.space(46)
-                color: modelData.path === root.currentPath
-                  ? Style.selectedFill
-                  : (noteMouse.containsMouse ? Style.hoverFill : "transparent")
-
-                Column {
-                  anchors.verticalCenter: parent.verticalCenter
-                  anchors.left: parent.left
-                  anchors.right: timeLabel.left
-                  anchors.leftMargin: Style.space(10)
-                  anchors.rightMargin: Style.space(6)
-                  spacing: Style.space(2)
-
-                  Text {
-                    width: parent.width
-                    text: modelData.title
-                    color: Color.foreground
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    elide: Text.ElideRight
-                  }
-
-                  Text {
-                    width: parent.width
-                    text: modelData.folder
-                    visible: modelData.folder !== ""
-                    color: Color.muted
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.caption
-                    elide: Text.ElideLeft
-                  }
-                }
-
-                Text {
-                  id: timeLabel
-                  anchors.right: parent.right
-                  anchors.rightMargin: Style.space(10)
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: Vault.relativeTime(modelData.mtime, Date.now() / 1000)
-                  color: Color.muted
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.caption
-                }
-
-                MouseArea {
-                  id: noteMouse
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  onClicked: root.selectNote(modelData)
-                  onDoubleClicked: {
-                    root.selectNote(modelData)
-                    root.editing = true
-                  }
-                }
+                foreground: root.foreground
+                title: modelData.title
+                folder: modelData.folder
+                age: Vault.relativeTime(modelData.mtime, Date.now() / 1000)
+                selected: modelData.path === root.currentPath
+                onActivated: root.selectPath(modelData.path)
               }
             }
 
             Text {
               anchors.centerIn: parent
               visible: root.notes.length === 0
-              text: root.searching ? "Buscando…" : "Nenhuma nota"
-              color: Color.muted
+              text: root.service && root.service.searching ? "Buscando…" : "Nenhuma nota"
+              color: root.secondary
               font.family: Style.font.family
               font.pixelSize: Style.font.bodySmall
             }
@@ -418,7 +278,7 @@ Item {
                   width: parent.width - modeButton.width - parent.spacing
                   anchors.verticalCenter: parent.verticalCenter
                   text: root.currentTitle !== "" ? root.currentTitle : "Nenhuma nota aberta"
-                  color: Color.foreground
+                  color: root.foreground
                   font.family: Style.font.family
                   font.pixelSize: Style.font.title
                   elide: Text.ElideRight
@@ -427,6 +287,7 @@ Item {
                 Button {
                   id: modeButton
                   text: root.editing ? "Ler  Ctrl+E" : "Editar  Ctrl+E"
+                  foreground: root.foreground
                   // Editing an oversized note would mean loading it whole into
                   // a TextArea and risking a save that writes back the recorte.
                   enabled: root.currentPath !== "" && !root.oversized
@@ -449,7 +310,7 @@ Item {
                   + Math.round(root.previewLimit / 1024)
                   + " KB — edição desabilitada para não truncar o arquivo."
                 wrapMode: Text.Wrap
-                color: Color.urgent
+                color: root.secondary
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
               }
@@ -469,7 +330,8 @@ Item {
                   text: root.oversized ? root.draft.slice(0, root.previewLimit) : root.draft
                   textFormat: Text.MarkdownText
                   wrapMode: Text.Wrap
-                  color: Color.foreground
+                  color: root.foreground
+                  linkColor: root.foreground
                   font.family: Style.font.family
                   font.pixelSize: Style.font.body
                   onLinkActivated: function(link) { Qt.openUrlExternally(link) }
@@ -481,9 +343,9 @@ Item {
                   width: parent.width
                   text: root.draft
                   wrapMode: TextEdit.Wrap
-                  color: Color.foreground
-                  selectionColor: Style.selectionFill
-                  selectedTextColor: Color.foreground
+                  color: root.foreground
+                  selectionColor: Util.alpha(root.foreground, 0.25)
+                  selectedTextColor: root.foreground
                   font.family: Style.font.family
                   font.pixelSize: Style.font.body
                   background: null
@@ -508,7 +370,7 @@ Item {
           Text {
             width: parent.width - stateLabel.width - parent.spacing
             text: root.currentPath
-            color: Color.muted
+            color: root.secondary
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
             elide: Text.ElideLeft
@@ -516,8 +378,10 @@ Item {
 
           Text {
             id: stateLabel
-            text: root.status !== "" ? root.status : (root.dirty ? "Não salvo" : "")
-            color: root.dirty ? Color.urgent : Color.muted
+            text: root.status !== "" ? root.status
+              : (root.service && root.service.status !== "" ? root.service.status
+                : (root.dirty ? "Não salvo" : ""))
+            color: root.secondary
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
           }
@@ -526,11 +390,8 @@ Item {
     }
   }
 
-  // Autosave keeps the vault's own minute-by-minute git commits meaningful
-  // without needing Ctrl+S after every keystroke.
-  Timer {
-    id: autosave
-    interval: 1500
-    onTriggered: root.saveDraft()
+  function doCapture() {
+    if (!service || !service.capture(captureField.text)) return
+    captureField.text = ""
   }
 }
