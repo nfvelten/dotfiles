@@ -1,0 +1,15 @@
+#!/bin/bash
+# Re-center a scratchpad after it is toggled into view.
+#
+# Window rules run `center` only at map time, so a scratchpad opened on one
+# monitor keeps those coordinates when its special workspace is later shown
+# on a monitor with a different logical size.
+#
+# Guarded on the active window title: toggle_special also *hides*, and in that
+# case the active window is a normal one that must not be moved.
+
+title="$1"
+
+[[ "$(hyprctl activewindow -j | jq -r '.title // empty')" == "$title" ]] || exit 0
+
+hyprctl dispatch "hl.dsp.window.center()" >/dev/null

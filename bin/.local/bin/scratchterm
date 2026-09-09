@@ -1,8 +1,10 @@
 #!/bin/bash
 if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:scratchterm")' > /dev/null 2>&1; then
     hyprctl dispatch "hl.dsp.workspace.toggle_special(\"scratchterm\")"
+    "$(dirname "$0")/scratchpad-center" __scratchterm
 else
     hyprctl dispatch "hl.dsp.exec_cmd(\"ghostty --title=__scratchterm\")"
     sleep 0.5
     hyprctl dispatch "hl.dsp.workspace.toggle_special(\"scratchterm\")"
+    "$(dirname "$0")/scratchpad-center" __scratchterm
 fi

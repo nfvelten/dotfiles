@@ -1,8 +1,10 @@
 #!/bin/bash
 if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:work-nvim")' > /dev/null 2>&1; then
     hyprctl dispatch "hl.dsp.workspace.toggle_special(\"work-nvim\")"
+    "$(dirname "$0")/scratchpad-center" __scratchwork
 else
     hyprctl dispatch "hl.dsp.exec_cmd(\"ghostty --title=__scratchwork --font-size=11 --working-directory=/home/nfvelten/code/work -e nvim .\")"
     sleep 0.5
     hyprctl dispatch "hl.dsp.workspace.toggle_special(\"work-nvim\")"
+    "$(dirname "$0")/scratchpad-center" __scratchwork
 fi
