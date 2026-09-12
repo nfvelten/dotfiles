@@ -34,7 +34,6 @@ dotnet-runtime
 dua-cli
 efibootmgr
 emacs
-evince
 exfatprogs
 expac
 eza
@@ -46,8 +45,6 @@ fcitx5-qt
 fd
 ffmpegthumbnailer
 fontconfig
-foot
-fuzzel
 fzf
 ghostty
 git
@@ -112,8 +109,6 @@ mkinitcpio
 mpv
 mpv-mpris
 mtr
-nautilus
-nautilus-python
 neovim
 networkmanager
 notcurses
@@ -153,7 +148,6 @@ rust
 sddm
 shellcheck
 shfmt
-signal-desktop
 slurp
 socat
 sof-firmware
@@ -161,7 +155,6 @@ spotify-player
 starship
 stow
 sudo
-sushi
 swaybg
 system-config-printer
 tailscale

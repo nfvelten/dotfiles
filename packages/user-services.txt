@@ -20,4 +20,3 @@ pull-homelab-backup.timer
 ssh-agent.socket
 vdirsyncer.timer
 wireplumber.service
-xdg-user-dirs.service
