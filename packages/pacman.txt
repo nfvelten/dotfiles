@@ -19,9 +19,6 @@ btrfs-progs
 chromium
 clang
 cliphist
-cups
-cups-filters
-cups-pk-helper
 ddcutil
 difftastic
 direnv
