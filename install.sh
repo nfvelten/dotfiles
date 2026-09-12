@@ -15,7 +15,7 @@
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STOW_MODULES=(bash git nvim hypr bin systemd ghostty tmux workmux atuin \
+STOW_MODULES=(bash git nvim hypr bin systemd desktop ghostty tmux workmux atuin \
                waybar walker mako lazygit starship fastfetch)
 
 # ── Verificar dependências ────────────────────────────────────────

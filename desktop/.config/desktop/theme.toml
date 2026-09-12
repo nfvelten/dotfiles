@@ -1,0 +1,7 @@
+# Yerba Mate — paleta compartilhada do desktop.
+background = "2a2e1e"
+foreground = "dce0d9"
+accent = "a67c52"
+muted = "4f5b4a"
+error = "c25d44"
+font = "JetBrainsMono Nerd Font"
