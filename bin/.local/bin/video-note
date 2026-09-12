@@ -74,6 +74,7 @@ Transcript:
 $TRANSCRIPT" < /dev/null 2>/dev/null)
 
 # Save note
+# shellcheck disable=SC1003
 SAFE_TITLE=$(echo "$TITLE" | tr -d '/:*?"<>|\\' | cut -c1-60)
 mkdir -p "$VAULT/${AMPHORA_DIR_PERSONAL:-Pessoal}/Videos"
 NOTE_FILE="$VAULT/${AMPHORA_DIR_PERSONAL:-Pessoal}/Videos/${SAFE_TITLE}.md"
