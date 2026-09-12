@@ -1,9 +1,0 @@
-[Unit]
-Description=Deck AI vault reindex
-After=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=%h/.local/bin/deck ai index
-StandardOutput=journal
-StandardError=journal

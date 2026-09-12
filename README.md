@@ -1,29 +1,16 @@
-# dotfiles
+# Personal Unix setup
 
-Configurações pessoais — Nicholas Velten.
+My desktop and development environment, managed with GNU Stow.
 
-Gerenciado com [GNU Stow](https://www.gnu.org/software/stow/).
-Temas baseados na paleta **Cimarrão** (dark) e **Tererê** (light).
+The active stack is:
 
-## Módulos
+- Hyprland, Waybar, Walker and Mako
+- Ghostty, Bash, tmux and Workmux
+- Neovim and Emacs with Org mode
+- Yazi, btop, git, glab, Elfeed and mpv
+- systemd user services for theme, wallpaper and vault tasks
 
-| Módulo | Destino | O que é |
-|--------|---------|---------|
-| `alacritty` · `ghostty` · `tmux` | `~/.config/<app>/` | Configs de terminal e multiplexador |
-| `starship` · `lazygit` · `fastfetch` | `~/.config/` | Prompt, TUI do git e fetch |
-| `systemd` | `~/.config/systemd/user/` | Timers e serviços: tema automático, sync do vault, backup do homelab, deck |
-| `bash` | `~/.bashrc` | Aliases, funções e init do shell (atuin, direnv, bash-preexec). Nada de trabalho — sourceia `~/.config/amphora/work.sh` se existir |
-| `git` | `~/.config/git/` | Config global (delta como pager, rerere, rebase no pull) + hook `post-commit` |
-| `nvim` | `~/.config/nvim/` | Config completa do Neovim (LazyVim + plugins + temas) |
-| `omarchy-themes` | `~/.config/omarchy/themes/` | Temas Yerba Mate (dark) e Tererê (light) para o Omarchy |
-| `omarchy-hooks` | `~/.config/omarchy/hooks/theme-set.d/` | Hook que sincroniza o tema do Claude Code, Zen e LibreWolf com o Omarchy |
-| `omarchy-shell` | `~/.config/omarchy/` | Layout do shell, barra flutuante e plugins locais do Omarchy |
-| `hypr` | `~/.config/hypr/` | Keybindings Hyprland — Super+N (daily note), Super+C (Claude Code) e windowrules |
-| `bin` | `~/.local/bin/` | Scripts: `daily-note` (scratchpad nvim), `claude-amphora` (scratchpad Claude Code) e `omarchy-theme-auto` |
-| `systemd` | `~/.config/systemd/user/` | Timer que troca o tema automaticamente às 6h e 18h |
-| `obsidian` | vault `/.obsidian/themes/Omarchy/` | Tema Obsidian com dark/light separados |
-
-## Instalação rápida
+## Install
 
 ```bash
 git clone https://github.com/nfvelten/dotfiles
@@ -31,100 +18,73 @@ cd dotfiles
 ./install.sh
 ```
 
-O script instala todos os módulos de uma vez via `stow`.
-
-Ficam de fora por não terem destino nesta máquina (Omarchy 4 substituiu):
-`mako`, `newsboat`, `walker`, `waybar`. Os arquivos seguem no repo.
-
-## Instalação por módulo
+Install a single module when needed:
 
 ```bash
-# Só o Neovim
 ./install.sh nvim
-
-# Só os temas do Omarchy
-./install.sh omarchy-themes
-
-# Múltiplos
-./install.sh nvim omarchy-themes omarchy-hooks
+./install.sh hypr tmux workmux
 ```
 
-## Obsidian
+The installer only includes active modules. Omarchy-specific modules and
+themes were removed from the active tree.
 
-O tema do Obsidian não usa symlink (o vault pode estar em qualquer lugar).
-Defina a variável de ambiente com o caminho do seu vault:
+## Reproduce the machine
+
+Package and service state lives in `packages/`:
+
+- `pacman.txt` — official repository packages
+- `aur.txt` — AUR packages
+- `user-services.txt` — enabled user units
 
 ```bash
-OBSIDIAN_VAULT=~/meu-vault ./install.sh obsidian
+make bootstrap
+make check
 ```
 
-Se não definir, o script procura em `~/obsidian` por padrão.
-
-## Dependências
-
-- `stow` — `sudo pacman -S stow` (Arch) / `sudo apt install stow` (Debian)
-- `jq` — necessário para o hook do Claude Code (`omarchy-hooks`)
-
-## Stack de dev
-
-Ferramentas de linha de comando da máquina. Repo oficial do Arch, exceto onde marcado.
+Refresh the manifests after an intentional package or service change:
 
 ```bash
-sudo pacman -S --needed \
-  ripgrep fd go-yq jq gron jless ripgrep-all pandoc-cli tokei \
-  ast-grep git-delta difftastic lazygit github-cli glab \
-  shellcheck shfmt just direnv watchexec \
-  podman podman-compose k9s kubectl \
-  oha hyperfine lnav mtr \
-  bat eza fzf zoxide yazi glow atuin starship btop tldr
+pacman -Qqe | sort > packages/pacman.txt
+pacman -Qqm | sort > packages/aur.txt
+comm -23 packages/pacman.txt packages/aur.txt > /tmp/pacman-native
+mv /tmp/pacman-native packages/pacman.txt
+systemctl --user list-unit-files --state=enabled --no-legend \
+  | awk '{print $1}' | sort > packages/user-services.txt
 ```
 
-AUR:
+## Layout
+
+Each top-level directory is a Stow package. Files inside it mirror their
+destination under `$HOME`.
+
+```text
+bash/       shell startup
+bin/        small user commands
+ghostty/    terminal
+hypr/       compositor and desktop bindings
+mako/       notifications
+nvim/       editor
+systemd/    user units and timers
+tmux/       multiplexer
+waybar/     status bar
+walker/     launcher
+workmux/    project workflow
+```
+
+Scripts in `bin/.local/bin` should do one small thing and depend only on
+commands listed in the package manifests. `scripts/` contains repository
+maintenance tools, such as `check-setup`.
+
+## Theme
+
+The shared palette is Yerba Mate for dark mode and Tererê for light mode.
+Theme changes are handled by the desktop theme service and consumed by the
+desktop, terminal, tmux, btop, Neovim and Emacs configurations.
+
+## Checks
 
 ```bash
-yay -S usql   # REPL universal de banco
+git diff --check
+make check
+shellcheck install.sh scripts/check-setup bin/.local/bin/*
 ```
-
-Fora do gerenciador de pacote (via `mise`/npm):
-
-```bash
-npm i -g @usebruno/cli        # bru — roda a air-api-collection
-playwright install chromium   # ~650MB em ~/.cache/ms-playwright
-```
-
-### Por função
-
-| Função | Ferramenta |
-|--------|-----------|
-| Busca | `rg` texto · `fd` arquivo · `ast-grep` por AST (callers, refactor) · `rga` dentro de PDF/docx/xlsx |
-| Dados | `jq` JSON · `yq` YAML · `gron` achata pra grep · `jless` JSON grande · `pandoc` converte doc |
-| Git | `delta` pager · `difft` diff estrutural · `lazygit` TUI · `gh` GitHub · `glab` GitLab |
-| Shell | `shellcheck` lint · `shfmt` format |
-| Infra | `podman` rootless · `podman-compose` · `just` tasks · `direnv` env por dir · `watchexec` roda ao mudar |
-| Teste | `oha` carga HTTP · `hyperfine` benchmark · `bru` requests · `playwright` browser |
-| DB | `usql` REPL universal (postgres/mysql/oracle) |
-| Debug | `lnav` navegador de log · `mtr` rede · `k9s`/`kubectl` cluster |
-
-### Config manual necessária
-
-- **`delta`** — já configurado no módulo `git` (`core.pager`, `interactive.diffFilter`).
-  Vem junto com `./install.sh git`.
-- **`direnv`** — hook já incluído no módulo `bash`. Vem com `./install.sh bash`.
-
-`podman` rootless precisa de `subuid`/`subgid` (o Arch já cria no install do pacote):
-
-```bash
-grep "^$USER" /etc/subuid /etc/subgid   # esperado: <user>:100000:65536
-```
-
-## Temas
-
-### Yerba Mate — dark
-Fundo oliva-industrial `#1c1e13`, texto prata `#dce0d9`, acento ocre `#a67c52`.
-
-### Tererê — light
-Fundo creme-manteiga `#fbf1c7`, texto carvão `#3c3836`, acento âmbar `#b57614`.
-
-Troca automática baseada no horário: **6h–18h → Tererê**, **18h–6h → Yerba Mate** (via systemd timer).
-
-Aplicados em: Neovim · Omarchy · Waybar · Terminal · Site pessoal · Obsidian

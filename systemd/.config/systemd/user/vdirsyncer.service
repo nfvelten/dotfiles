@@ -4,6 +4,7 @@ Description=vdirsyncer sports calendars sync
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/vdirsyncer sync
+ExecStart=/home/nfvelten/.local/bin/football-calendar-prefix
 ExecStart=/home/nfvelten/.local/bin/chess-cal-sync
 ExecStart=/home/nfvelten/.local/bin/sports-annual-sync
 ExecStart=/home/nfvelten/.local/bin/esports-cal-sync

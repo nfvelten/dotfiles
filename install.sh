@@ -1,44 +1,22 @@
 #!/bin/bash
 # ══════════════════════════════════════════════════════════════════
 # dotfiles install — Nicholas Velten
-# Usa GNU Stow para criar symlinks de cada módulo no $HOME
+# Usa GNU Stow para criar symlinks de cada módulo no $HOME.
 #
 # Uso:
 #   ./install.sh              — instala todos os módulos
 #   ./install.sh nvim         — instala só o nvim
 #   ./install.sh nvim hypr    — instala múltiplos
 #
-# Módulos disponíveis:
-#   bash            → ~/.bashrc
-#   git             → ~/.config/git/ (config + hooks)
-#   nvim            → ~/.config/nvim/
-#   alacritty       → ~/.config/alacritty/
-#   ghostty         → ~/.config/ghostty/
-#   tmux            → ~/.config/tmux/
-#   lazygit         → ~/.config/lazygit/
-#   starship        → ~/.config/starship.toml
-#   fastfetch       → ~/.config/fastfetch/
-#   omarchy-hooks   → ~/.config/omarchy/hooks/
-#   omarchy-shell   → ~/.config/omarchy/ (shell.json + plugins locais)
-#   hypr            → ~/.config/hypr/ (bindings + windowrules)
-#   bin             → ~/.local/bin/ (daily-note, omarchy-theme-auto)
-#   systemd         → ~/.config/systemd/user/ (timer troca automática de tema)
-#   obsidian        → instala tema no vault (requer OBSIDIAN_VAULT)
-#
-# Nao instalados (destino nao existe nesta maquina — Omarchy 4 substituiu):
-#   mako, newsboat, walker, waybar
-#
-# Temas Omarchy são instalados diretamente dos repos públicos:
-#   github.com/nfvelten/omarchy-yerba-mate  → dark
-#   github.com/nfvelten/omarchy-terere      → light
+# Módulos ativos: shell, editor, terminal, compositor, barra, launcher,
+# notificações, tmux, Workmux, scripts e serviços de usuário.
 # ══════════════════════════════════════════════════════════════════
 
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STOW_MODULES=(bash git nvim omarchy-hooks omarchy-shell hypr bin systemd \
-               alacritty ghostty tmux lazygit starship fastfetch)
-OBSIDIAN_MODULE="obsidian"
+STOW_MODULES=(bash git nvim hypr bin systemd ghostty tmux workmux atuin \
+               waybar walker mako lazygit starship fastfetch)
 
 # ── Verificar dependências ────────────────────────────────────────
 check_deps() {
@@ -63,43 +41,6 @@ stow_module() {
   echo "  ✓ $module"
 }
 
-# ── Instalar temas Omarchy dos repos públicos ────────────────────
-install_omarchy_themes() {
-  local themes_dir="$HOME/.config/omarchy/themes"
-  mkdir -p "$themes_dir"
-
-  for theme in yerba-mate terere; do
-    local repo="omarchy-${theme}"
-    local dest="$themes_dir/$theme"
-    if [[ -d "$dest/.git" ]]; then
-      echo "→ Atualizando $theme..."
-      git -C "$dest" pull --ff-only
-    else
-      echo "→ Instalando $theme..."
-      rm -rf "$dest"
-      git clone "https://github.com/nfvelten/$repo.git" "$dest"
-    fi
-    echo "  ✓ $theme"
-  done
-}
-
-# ── Instalar tema do Obsidian ─────────────────────────────────────
-install_obsidian() {
-  local vault="${OBSIDIAN_VAULT:-$HOME/obsidian}"
-
-  if [[ ! -d "$vault" ]]; then
-    echo "⚠  Vault Obsidian não encontrado em $vault"
-    echo "   Defina OBSIDIAN_VAULT=/caminho/para/vault e rode novamente"
-    return
-  fi
-
-  local dest="$vault/.obsidian/themes/Omarchy"
-  mkdir -p "$dest"
-  cp "$DOTFILES_DIR/$OBSIDIAN_MODULE/themes/Omarchy/theme.css" "$dest/theme.css"
-  cp "$DOTFILES_DIR/$OBSIDIAN_MODULE/themes/Omarchy/manifest.json" "$dest/manifest.json"
-  echo "  ✓ obsidian (vault: $vault)"
-}
-
 # ── Main ──────────────────────────────────────────────────────────
 check_deps
 
@@ -108,19 +49,12 @@ if [[ $# -eq 0 ]]; then
   for module in "${STOW_MODULES[@]}"; do
     stow_module "$module"
   done
-  install_obsidian
-  install_omarchy_themes
-  # Ativa o timer de troca automática de tema
   if command -v systemctl &>/dev/null; then
     systemctl --user daemon-reload
-    systemctl --user enable --now omarchy-theme-auto.timer 2>/dev/null && \
-      echo "  ✓ timer omarchy-theme-auto ativado"
   fi
 else
   for arg in "$@"; do
-    if [[ "$arg" == "obsidian" ]]; then
-      install_obsidian
-    elif [[ -d "$DOTFILES_DIR/$arg" ]]; then
+    if [[ -d "$DOTFILES_DIR/$arg" ]]; then
       stow_module "$arg"
     else
       echo "⚠  Módulo '$arg' não encontrado — ignorando"

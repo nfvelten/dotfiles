@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -u
+
+ok=0
+fail=0
+
+check_command() {
+    if command -v "$1" >/dev/null 2>&1; then
+        printf 'ok   %s\n' "$1"
+        ((ok++))
+    else
+        printf 'miss %s\n' "$1"
+        ((fail++))
+    fi
+}
+
+check_unit() {
+    if systemctl --user is-enabled --quiet "$1" 2>/dev/null; then
+        printf 'ok   %s\n' "$1"
+        ((ok++))
+    else
+        printf 'off  %s\n' "$1"
+        ((fail++))
+    fi
+}
+
+printf '%s\n' 'commands'
+for command in hyprctl waybar tmux atuin nvim emacsclient ghostty walker yazi mpv wl-copy; do
+    check_command "$command"
+done
+
+printf '%s\n' 'user services'
+while read -r unit; do
+    [[ -z "$unit" ]] || check_unit "$unit"
+done < "$(dirname "$0")/../packages/user-services.txt"
+
+printf '\n%d available, %d missing or disabled\n' "$ok" "$fail"
+exit "$fail"

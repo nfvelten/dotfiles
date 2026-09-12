@@ -1,6 +1,0 @@
-[Unit]
-Description=Omarchy auto theme switch based on time of day
-
-[Service]
-Type=oneshot
-ExecStart=%h/.local/bin/omarchy-theme-auto

@@ -1,0 +1,31 @@
+# Worktree workflow for tmux.
+# Keep the terminal palette so dark/light follows the desktop theme.
+
+nerdfont: true
+theme: default
+
+mode: window
+window_prefix: wm-
+window_placement: after_current
+worktree_naming: basename
+
+merge_strategy: rebase
+merge_keep: true
+
+status_format: true
+status_icons:
+  working: "●"
+  waiting: "○"
+  done: "✓"
+
+# Every worktree opens with the editor and a shell.
+panes:
+  - command: nvim .
+    focus: true
+  - split: horizontal
+
+sidebar:
+  position: left
+  width: 32
+  layout: compact
+  dim_stale: true
