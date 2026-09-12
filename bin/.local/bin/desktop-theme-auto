@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+requested=${1:-}
+if [[ $requested == light || $requested == dark ]]; then
+    mode=$requested
+else
+    hour=$(date +%H)
+    if ((10#$hour >= 7 && 10#$hour < 18)); then
+        mode=light
+    else
+        mode=dark
+    fi
+fi
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/desktop"
+state_file="$state_dir/theme"
+mkdir -p "$state_dir"
+theme_file="$state_dir/ghostty.conf"
+[[ -z $requested && -f $state_file && $(<"$state_file") == "$mode" && -f $theme_file ]] && exit 0
+
+gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode" 2>/dev/null || true
+
+browser_profile="$HOME/.config/librewolf/librewolf/7pvskbjk.default-default"
+if [[ -f $browser_profile/user.js ]]; then
+    system_theme=0
+    [[ $mode == dark ]] && system_theme=1
+    if rg -q '^user_pref\("ui\.systemUsesDarkTheme"' "$browser_profile/user.js"; then
+        sed -i "s/^user_pref(\"ui.systemUsesDarkTheme\", .*/user_pref(\"ui.systemUsesDarkTheme\", $system_theme);/" "$browser_profile/user.js"
+    else
+        printf 'user_pref("ui.systemUsesDarkTheme", %s);\n' "$system_theme" >> "$browser_profile/user.js"
+    fi
+    if rg -q '^user_pref\("layout\.css\.prefers-color-scheme\.content-override"' "$browser_profile/user.js"; then
+        sed -i 's/^user_pref("layout\.css\.prefers-color-scheme\.content-override", .*/user_pref("layout.css.prefers-color-scheme.content-override", 2);/' "$browser_profile/user.js"
+    else
+        printf 'user_pref("layout.css.prefers-color-scheme.content-override", 2);\n' >> "$browser_profile/user.js"
+    fi
+fi
+
+python3 "$HOME/.config/desktop/render-theme.py" "$mode" >/dev/null
+printf '%s\n' "$mode" > "$state_file"
+
+theme_name=yerba-mate
+[[ $mode == light ]] && theme_name=terere
+emacsclient --socket-name=default --eval \
+    "(progn (mapc #'disable-theme custom-enabled-themes) (load-theme '$theme_name t))" \
+    >/dev/null 2>&1 || true
+
+makoctl reload 2>/dev/null || true
+pkill -SIGUSR2 -x waybar 2>/dev/null || true

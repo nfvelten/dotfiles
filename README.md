@@ -39,6 +39,8 @@ Package and service state lives in `packages/`:
 ```bash
 make bootstrap
 make check
+make theme-dark
+make theme-light
 ```
 
 Refresh the manifests after an intentional package or service change:
