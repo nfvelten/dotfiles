@@ -36,6 +36,16 @@ Package and service state lives in `packages/`:
 - `aur.txt` — AUR packages
 - `user-services.txt` — enabled user units
 
+The official packages are also grouped into installation layers:
+
+```bash
+make install-core
+make install-desktop
+make install-development
+make install-optional
+make install-aur
+```
+
 ```bash
 make bootstrap
 make check

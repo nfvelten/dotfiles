@@ -1,11 +1,26 @@
 SHELL := /usr/bin/bash
 
-.PHONY: bootstrap packages user-services theme theme-dark theme-light check doctor snapshot restore org-status org-backup
+.PHONY: bootstrap packages install-core install-desktop install-development install-optional install-aur user-services theme theme-dark theme-light check doctor snapshot restore org-status org-backup
 
 bootstrap: packages user-services check
 
 packages:
 	@sudo pacman -S --needed - < packages/pacman.txt
+	@yay -S --needed - < packages/aur.txt
+
+install-core:
+	@sudo pacman -S --needed - < packages/layers/core.txt
+
+install-desktop:
+	@sudo pacman -S --needed - < packages/layers/desktop.txt
+
+install-development:
+	@sudo pacman -S --needed - < packages/layers/development.txt
+
+install-optional:
+	@sudo pacman -S --needed - < packages/layers/optional.txt
+
+install-aur:
 	@yay -S --needed - < packages/aur.txt
 
 user-services:
