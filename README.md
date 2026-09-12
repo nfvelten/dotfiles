@@ -44,6 +44,7 @@ make install-desktop
 make install-development
 make install-optional
 make install-aur
+make sync-layers
 ```
 
 ```bash

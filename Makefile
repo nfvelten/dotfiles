@@ -1,12 +1,15 @@
 SHELL := /usr/bin/bash
 
-.PHONY: bootstrap packages install-core install-desktop install-development install-optional install-aur user-services theme theme-dark theme-light check doctor snapshot restore org-status org-backup
+.PHONY: bootstrap packages sync-layers install-core install-desktop install-development install-optional install-aur user-services theme theme-dark theme-light check doctor snapshot restore org-status org-backup
 
 bootstrap: packages user-services check
 
 packages:
 	@sudo pacman -S --needed - < packages/pacman.txt
 	@yay -S --needed - < packages/aur.txt
+
+sync-layers:
+	@scripts/sync-layers
 
 install-core:
 	@sudo pacman -S --needed - < packages/layers/core.txt
@@ -48,6 +51,7 @@ snapshot:
 	@pacman -Qqm | sort > packages/aur.txt
 	@comm -23 packages/pacman.txt packages/aur.txt > /tmp/pacman-native
 	@mv /tmp/pacman-native packages/pacman.txt
+	@scripts/sync-layers
 	@systemctl --user list-unit-files --state=enabled --no-legend | awk '{print $$1}' | sort > packages/user-services.txt
 	@echo "Manifests updated. Review with: git diff"
 
