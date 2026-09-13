@@ -1,0 +1,6 @@
+[Unit]
+Description=Save personal configuration and Org vault
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/dotfiles-backup

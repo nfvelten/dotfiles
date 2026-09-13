@@ -1,6 +1,6 @@
 SHELL := /usr/bin/bash
 
-.PHONY: bootstrap packages sync-layers install-core install-desktop install-development install-optional install-aur user-services theme theme-dark theme-light check doctor snapshot restore org-status org-backup
+.PHONY: bootstrap packages sync-layers install-core install-desktop install-development install-optional install-aur user-services theme theme-dark theme-light check doctor snapshot restore org-status org-backup backup
 
 bootstrap: packages user-services check
 
@@ -66,3 +66,6 @@ org-backup:
 	@if [ ! -d "$(HOME)/org/.git" ]; then git -C "$(HOME)/org" init; fi
 	@git -C "$(HOME)/org" add -A
 	@git -C "$(HOME)/org" diff --cached --quiet || git -C "$(HOME)/org" commit -m "chore: save org vault"
+
+backup:
+	@dotfiles-backup

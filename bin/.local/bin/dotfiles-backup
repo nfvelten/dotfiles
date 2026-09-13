@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+commit_repo() {
+  local dir=$1 message=$2
+  [[ -d "$dir/.git" ]] || return 0
+  git -C "$dir" add -A
+  git -C "$dir" diff --cached --quiet && return 0
+  git -C "$dir" commit -m "$message" >/dev/null
+  printf 'saved %s\n' "$dir"
+}
+
+commit_repo "$HOME/code/personal/dotfiles" "chore: save desktop configuration"
+commit_repo "$HOME/.config/emacs" "chore: save Emacs configuration"
+commit_repo "$HOME/org" "chore: save org vault"
