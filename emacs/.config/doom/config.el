@@ -138,6 +138,53 @@ Daily notes are picked by the date in their filename (dd-mm-yyyy.org), not mtime
                  (insert-file-contents (nf/org-file "Templates/Daily Notes.org"))
                  (buffer-string)))))))
 
+(defvar nf/note-templates
+  '(("Demanda" "Demanda.org" "Trabalho/Air/Demandas/Em Desenvolvimento")
+    ("Aprendizado Técnico" "Aprendizado Técnico.org" "Pessoal/Estudos")
+    ("Review" "Review.org" "Pessoal/Reviews")
+    ("Bug Bounty Program" "Bug Bounty Program.org" "Pessoal/Estudos/Bug Bounty")
+    ("Target Notes" "Target Notes.org" "Pessoal/Estudos/Bug Bounty")
+    ("Recon Runbook" "Recon Runbook.org" "Pessoal/Estudos/Bug Bounty")
+    ("Finding Report" "Finding Report.org" "Pessoal/Estudos/Bug Bounty"))
+  "Note templates as (NAME FILE DIRECTORY), relative to `org-directory'.
+Templates use org-capture escapes plus a literal {{title}} placeholder.")
+
+(defun nf/fill-template (template &optional title)
+  "Return TEMPLATE (a file in Templates/) with org-capture escapes expanded.
+{{title}} is replaced with TITLE afterwards, so titles never pass through
+the capture escape parser."
+  (require 'org-capture)
+  (replace-regexp-in-string
+   "{{title}}" (or title "")
+   (org-capture-fill-template
+    (with-temp-buffer
+      (insert-file-contents (nf/org-file (concat "Templates/" template)))
+      (buffer-string)))
+   t t))
+
+(defun nf/new-note (name title)
+  "Create a note titled TITLE from the vault template NAME and open it."
+  (interactive
+   (list (completing-read "Template: " nf/note-templates nil t)
+         (read-string "Título: ")))
+  (pcase-let* ((`(,_ ,template ,dir) (assoc name nf/note-templates))
+               (file (nf/org-file (format "%s/%s.org" dir title))))
+    (when (file-exists-p file)
+      (user-error "Nota já existe: %s" file))
+    (make-directory (file-name-directory file) t)
+    (find-file file)
+    (insert (nf/fill-template template title))))
+
+(defun nf/weekly-review ()
+  "Open this week's review (Weekly/YYYY-Www.org), creating it from the template."
+  (interactive)
+  (let* ((file (nf/org-file (format-time-string "Weekly/%G-W%V.org")))
+         (new (not (file-exists-p file))))
+    (make-directory (file-name-directory file) t)
+    (find-file file)
+    (when new
+      (insert (nf/fill-template "Weekly Review.org")))))
+
 (after! org
   (setq org-ellipsis "..."
         org-hide-emphasis-markers t
@@ -231,7 +278,9 @@ Daily notes are picked by the date in their filename (dd-mm-yyyy.org), not mtime
       (:prefix ("o" . "open")
        :desc "Org agenda" "a" #'org-agenda
        :desc "Elfeed" "e" #'elfeed
-       :desc "Daily note" "j" #'nf/daily-note)
+       :desc "Daily note" "j" #'nf/daily-note
+       :desc "New note from template" "n" #'nf/new-note
+       :desc "Weekly review" "w" #'nf/weekly-review)
       (:prefix ("w" . "window")
        :desc "Window left" "h" #'evil-window-left
        :desc "Window down" "j" #'evil-window-down
