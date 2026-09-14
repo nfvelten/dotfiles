@@ -66,6 +66,7 @@ org-backup:
 	@if [ ! -d "$(HOME)/org/.git" ]; then git -C "$(HOME)/org" init; fi
 	@git -C "$(HOME)/org" add -A
 	@git -C "$(HOME)/org" diff --cached --quiet || git -C "$(HOME)/org" commit -m "chore: save org vault"
+	@git -C "$(HOME)/org" push --quiet origin HEAD
 
 backup:
 	@dotfiles-backup

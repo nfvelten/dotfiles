@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -u
+
+session=org-agents
+org="$HOME/org"
+
+if ! tmux has-session -t "$session" 2>/dev/null; then
+    tmux new-session -d -s "$session" -c "$org" -n agent codex
+    tmux split-window -h -t "$session:agent" -c "$org" \
+        "emacsclient --socket-name=default -nw --eval '(nf/daily-note)'"
+    tmux select-pane -t "$session:1.1"
+fi
+
+if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:scratchtmux")' >/dev/null 2>&1; then
+    "$HOME/.local/bin/hypr-toggle-special" scratchtmux
+    "$HOME/.local/bin/scratchpad-center" __scratchtmux
+else
+    ghostty --title=__scratchtmux -e tmux attach-session -t "$session" >/dev/null 2>&1 &
+    sleep 0.5
+    "$HOME/.local/bin/hypr-toggle-special" scratchtmux
+    "$HOME/.local/bin/scratchpad-center" __scratchtmux
+fi
