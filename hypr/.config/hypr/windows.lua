@@ -14,7 +14,6 @@ end
 
 scratch_rule("__scratchterm", "scratchterm", "930 510")
 scratch_rule("__scratchnvim", "nvim", "1024 570")
-scratch_rule("__scratchherdr", "herdr", "1024 570")
 scratch_rule("__scratchwork", "work-nvim", "1024 570")
 scratch_rule("__scratchikhal", "ikhal", "1024 570")
 scratch_rule("__scratchspotify", "spotify", "1024 570")

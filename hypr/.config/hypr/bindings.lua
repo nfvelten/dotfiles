@@ -7,7 +7,6 @@ o.bind("SUPER + grave", "Scratchpad terminal", "uwsm app -- $HOME/.local/bin/scr
 o.bind("SUPER + CTRL + grave", "Window switcher", "uwsm app -- walker -m windows")
 o.bind("SUPER + N", "Nvim", "uwsm app -- $HOME/.local/bin/scratchnvim")
 o.bind("SUPER + H", "Keybindings", "uwsm app -- $HOME/.local/bin/scratchkeys")
-o.bind("SUPER + C", "Herdr", "uwsm app -- $HOME/.local/bin/scratchherdr")
 
 -- SUPER+RETURN, SUPER+ALT+RETURN e SUPER+SHIFT+RETURN já são o padrão do
 -- Omarchy (Terminal/Tmux/Browser via {omarchy = "..."} em applications.lua),

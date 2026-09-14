@@ -2,18 +2,19 @@
 
 Este arquivo conecta o projeto à memória pessoal de agents.
 
+Repositório **público** (github.com/nfvelten/dotfiles): nunca commitar segredos,
+notas do vault (`~/org`) nem dados de trabalho.
+
 ## Memória
 
-- Nota do projeto: `/home/nfvelten/amphora/Pessoal/Memória de Agentes/Projetos/dotfiles.md`
-- Índice geral: `/home/nfvelten/amphora/Pessoal/Memória de Agentes/Index.md`
+- Nota do projeto: `/home/nfvelten/org/Pessoal/Memória de Agentes/Projetos/dotfiles.org`
+- Índice geral: `/home/nfvelten/org/Pessoal/Memória de Agentes/Index.org`
 - Workspace: `/home/nfvelten/code/personal`
 
-Antes de buscas amplas, rode a partir de `/home/nfvelten/code/personal`:
+Antes de buscas amplas, use o MCP `agent-memory`:
 
-```bash
-bin/agent-memory summary dotfiles
-bin/agent-memory search --project dotfiles <termo>
-```
+- `summary("dotfiles")` — contexto operacional
+- `search(query, projeto="dotfiles")` — busca na nota e notas ligadas
 
 ## Fluxo recomendado
 
@@ -21,4 +22,4 @@ bin/agent-memory search --project dotfiles <termo>
 2. Consulte a nota do projeto na memória pessoal.
 3. Só então busque no código ou no vault inteiro.
 
-Registre decisões estáveis em `/home/nfvelten/amphora/Pessoal/Memória de Agentes/Decisões.md` ou na nota específica do projeto.
+Registre decisões estáveis em `/home/nfvelten/org/Pessoal/Memória de Agentes/Decisões.org` ou na nota específica do projeto.

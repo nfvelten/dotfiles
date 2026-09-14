@@ -19,8 +19,8 @@ miniflux() {
 # ── Local, fora do git ────────────────────────────────────────────
 # secrets  — variáveis de ambiente sensíveis
 # work.sh  — funções de trabalho (bancos, tokens); fora do repo público
-[ -f ~/.config/amphora/secrets ] && source ~/.config/amphora/secrets
-[ -f ~/.config/amphora/work.sh ] && source ~/.config/amphora/work.sh
+[ -f ~/.config/shell/secrets ] && source ~/.config/shell/secrets
+[ -f ~/.config/shell/work.sh ] && source ~/.config/shell/work.sh
 
 # ── Shell tooling ─────────────────────────────────────────────────
 [[ -f /usr/share/bash-preexec/bash-preexec.sh ]] && source /usr/share/bash-preexec/bash-preexec.sh
