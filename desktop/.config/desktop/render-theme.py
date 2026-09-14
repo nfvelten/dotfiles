@@ -9,6 +9,7 @@ config = Path.home() / ".config"
 mode = __import__("sys").argv[1] if len(__import__("sys").argv) > 1 else "dark"
 theme = tomllib.loads((root / f"theme-{mode}.toml").read_text())
 targets = {
+    "quickshell.qml": "quickshell/Theme.qml",
     "mako.conf": "mako/config",
     "hyprlock.conf": "hypr/hyprlock.conf",
     "colors.css": "waybar/colors.css",

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+command=${1:-ping}
+
+case "$command" in
+    menu)
+        action=${2:-toggle}
+        case "$action" in
+            toggle) exec /usr/bin/quickshell ipc call yerba toggleMenu ;;
+            close) exec /usr/bin/quickshell ipc call yerba closeMenu ;;
+            *) printf 'usage: desktop-shell menu {toggle|close}\n' >&2; exit 2 ;;
+        esac
+        ;;
+    ping)
+        /usr/bin/quickshell ipc show | rg -q '^target yerba$'
+        printf 'ok\n'
+        ;;
+    *)
+        printf 'usage: desktop-shell {menu {toggle|close}|ping}\n' >&2
+        exit 2
+        ;;
+esac

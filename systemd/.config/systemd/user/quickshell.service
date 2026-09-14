@@ -1,0 +1,11 @@
+[Unit]
+Description=Minimal Yerba Mate desktop shell
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/quickshell -c default
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
