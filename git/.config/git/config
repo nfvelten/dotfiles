@@ -14,8 +14,6 @@
 [credential "https://gist.github.com"]
 	helper =
 	helper = !/usr/bin/gh auth git-credential
-[core]
-	hooksPath = /home/nfvelten/.config/git/hooks
 [init]
 	defaultBranch = master
 [pull]

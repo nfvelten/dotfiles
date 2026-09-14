@@ -1,5 +1,3 @@
-amphora-focus-sample.timer
-amphora-sync.timer
 desktop-theme-auto.timer
 desktop-wallpaper.service
 dynamic-wallpaper.timer

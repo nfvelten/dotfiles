@@ -8,11 +8,6 @@ return {
       function() require("yazi").yazi() end,
       desc = "Abrir yazi (diretório atual)",
     },
-    {
-      "<leader>E",
-      function() require("yazi").yazi(nil, vim.fn.expand("~/amphora")) end,
-      desc = "Abrir yazi (vault)",
-    },
   },
   opts = {
     open_for_directories = true,

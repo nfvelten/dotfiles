@@ -17,11 +17,6 @@ These scripts are installed into `~/.local/bin` by GNU Stow.
 ## Work
 
 - `comercial-api-start` — start the commercial API workspace
-- `meeting-record` — record a meeting
-- `meeting-transcribe` — transcribe a recording
-- `video-note` — create a note from a video
-- `habit-tracker` — update habits
-- `semanal-auto` — update the weekly note
 - `open-board-item` — open a board item
 
 ## Development

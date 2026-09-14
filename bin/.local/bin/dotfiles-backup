@@ -11,5 +11,7 @@ commit_repo() {
 }
 
 commit_repo "$HOME/code/personal/dotfiles" "chore: save desktop configuration"
-commit_repo "$HOME/.config/emacs" "chore: save Emacs configuration"
 commit_repo "$HOME/org" "chore: save org vault"
+
+# The vault has a private remote; dotfiles is public and stays a manual push.
+git -C "$HOME/org" push --quiet origin HEAD || printf 'push failed %s\n' "$HOME/org" >&2
