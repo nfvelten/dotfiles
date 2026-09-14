@@ -4,7 +4,7 @@ My desktop and development environment, managed with GNU Stow.
 
 The active stack is:
 
-- Hyprland, Waybar, Walker and Mako
+- Hyprland and Quickshell
 - Ghostty, Bash, tmux and Workmux
 - Neovim and Emacs with Org mode
 - Yazi, btop, git, glab, Elfeed and mpv
@@ -75,12 +75,10 @@ bash/       shell startup
 bin/        small user commands
 ghostty/    terminal
 hypr/       compositor and desktop bindings
-mako/       notifications
 nvim/       editor
+quickshell/ bar, launcher and notifications
 systemd/    user units and timers
 tmux/       multiplexer
-waybar/     status bar
-walker/     launcher
 workmux/    project workflow
 ```
 

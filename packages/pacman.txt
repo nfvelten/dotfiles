@@ -99,7 +99,6 @@ llvm
 lnav
 lua51
 luarocks
-mako
 man-db
 mariadb-libs
 mkinitcpio
@@ -175,7 +174,6 @@ vdirsyncer
 vpl-gpu-rt
 vulkan-intel
 watchexec
-waybar
 wf-recorder
 whois
 wireless-regdb

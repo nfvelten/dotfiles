@@ -13,7 +13,6 @@ hyprlock
 hyprpicker
 hyprpolkitagent
 hyprsunset
-mako
 noto-fonts
 noto-fonts-cjk
 noto-fonts-emoji
@@ -26,7 +25,6 @@ playerctl
 power-profiles-daemon
 sddm
 slurp
-waybar
 wireplumber
 wl-clipboard
 woff2-font-awesome

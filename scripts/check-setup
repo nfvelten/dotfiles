@@ -25,7 +25,7 @@ check_unit() {
 }
 
 printf '%s\n' 'commands'
-for command in hyprctl waybar tmux atuin nvim emacsclient ghostty walker yazi mpv wl-copy; do
+for command in hyprctl quickshell tmux atuin nvim emacsclient ghostty yazi mpv wl-copy; do
     check_command "$command"
 done
 

@@ -45,6 +45,3 @@ theme_name=yerba-mate
 emacsclient --socket-name=default --eval \
     "(progn (mapc #'disable-theme custom-enabled-themes) (load-theme '$theme_name t))" \
     >/dev/null 2>&1 || true
-
-makoctl reload 2>/dev/null || true
-pkill -SIGUSR2 -x waybar 2>/dev/null || true

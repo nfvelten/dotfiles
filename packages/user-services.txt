@@ -1,13 +1,11 @@
 desktop-theme-auto.timer
 desktop-wallpaper.service
 dynamic-wallpaper.timer
-elephant.service
 emacs.service
 etc-config-snapshot.timer
 gnome-keyring-daemon.socket
 hypridle.service
 hyprpolkitagent.service
-mako.service
 p11-kit-server.socket
 pipewire-pulse.service
 pipewire-pulse.socket

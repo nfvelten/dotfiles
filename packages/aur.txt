@@ -1,10 +1,4 @@
 asdcontrol
-elephant
-elephant-calc
-elephant-clipboard
-elephant-desktopapplications
-elephant-menus
-elephant-providerlist
 hyprland-preview-share-picker
 limine-mkinitcpio-hook
 limine-snapper-sync
@@ -19,7 +13,6 @@ ttfx
 tzupdate
 ufw-docker
 usql
-walker
 xdg-terminal-exec
 yaru-icon-theme
 yay
