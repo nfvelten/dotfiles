@@ -11,15 +11,15 @@
 hl.monitor({
     output   = "eDP-1",
     mode     = "1366x768@60.01",
-    position = "1295x720",
-    scale    = 1.25,
+    position = "117x900",
+    scale    = 1,
 })
 
 hl.monitor({
     output   = "HDMI-A-1",
-    mode     = "1600x900@60.0",
-    position = "1280x0",
-    scale    = 1.25,
+    mode     = "1600x900@60",
+    position = "0x0",
+    scale    = 1,
 })
 
 hl.env("XDPH_IGNORE_CURSOR", 1)
