@@ -27,7 +27,7 @@ hl.window_rule({
     match = {
         title = "^__scratchterm$",
     },
-    size = { 930, 510 },
+    size = { "monitor_w*0.73", "monitor_h*0.71" },
 })
 
 hl.window_rule({
@@ -59,7 +59,7 @@ hl.window_rule({
     match = {
         title = "^__scratchnvim$",
     },
-    size = { 1024, 570 },
+    size = { "monitor_w*0.8", "monitor_h*0.79" },
 })
 
 hl.window_rule({
@@ -91,7 +91,7 @@ hl.window_rule({
     match = {
         title = "^__scratchwork$",
     },
-    size = { 1024, 570 },
+    size = { "monitor_w*0.8", "monitor_h*0.79" },
 })
 
 hl.window_rule({
@@ -123,7 +123,7 @@ hl.window_rule({
     match = {
         title = "^__scratchkeys$",
     },
-    size = { 1024, 570 },
+    size = { "monitor_w*0.8", "monitor_h*0.79" },
 })
 
 hl.window_rule({
@@ -155,7 +155,7 @@ hl.window_rule({
     match = {
         title = "^__scratchikhal$",
     },
-    size = { 1024, 570 },
+    size = { "monitor_w*0.8", "monitor_h*0.79" },
 })
 
 hl.window_rule({
@@ -187,7 +187,7 @@ hl.window_rule({
     match = {
         title = "^__scratchspotify$",
     },
-    size = { 1024, 570 },
+    size = { "monitor_w*0.8", "monitor_h*0.79" },
 })
 
 hl.window_rule({
@@ -213,7 +213,7 @@ hl.window_rule({
     match = {
         class = "^org.khal.calendar$",
     },
-    size = { 700, 420 },
+    size = { "monitor_w*0.55", "monitor_h*0.58" },
 })
 
 hl.window_rule({
@@ -255,7 +255,7 @@ hl.window_rule({
     match = {
         class = "^spotify-player$",
     },
-    size = { 1100, 650 },
+    size = { "monitor_w*0.86", "monitor_h*0.9" },
 })
 
 hl.window_rule({
@@ -297,7 +297,7 @@ hl.window_rule({
     match = {
         title = "^__scratchtmux$",
     },
-    size = { 1024, 570 },
+    size = { "monitor_w*0.8", "monitor_h*0.79" },
 })
 
 hl.window_rule({

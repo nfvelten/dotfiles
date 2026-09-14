@@ -74,9 +74,9 @@
 ;; org-agenda-files is rebuilt on every agenda call — see `nf/agenda-files'.
 (setq org-directory "~/org/")
 
-(setq doom-font (font-spec :family "JetBrainsMono Nerd Font" :size 15)
-      doom-variable-pitch-font (font-spec :family "iA Writer Quattro S" :size 16)
-      doom-serif-font (font-spec :family "iA Writer Quattro S" :size 16))
+(setq doom-font (font-spec :family "JetBrainsMono Nerd Font" :size 18)
+      doom-variable-pitch-font (font-spec :family "iA Writer Quattro S" :size 19)
+      doom-serif-font (font-spec :family "iA Writer Quattro S" :size 19))
 
 (setq confirm-kill-emacs nil
       delete-by-moving-to-trash t
