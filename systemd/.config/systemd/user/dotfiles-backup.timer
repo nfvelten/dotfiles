@@ -1,5 +1,5 @@
 [Unit]
-Description=Save personal configuration and Org vault every night
+Description=Nightly push of committed Org vault and unsaved-config report
 
 [Timer]
 OnCalendar=*-*-* 03:30:00

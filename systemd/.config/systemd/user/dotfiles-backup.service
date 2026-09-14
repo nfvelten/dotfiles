@@ -1,5 +1,5 @@
 [Unit]
-Description=Save personal configuration and Org vault
+Description=Push committed Org vault and report unsaved configuration
 
 [Service]
 Type=oneshot

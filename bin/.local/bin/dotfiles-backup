@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-commit_repo() {
-  local dir=$1 message=$2
+# Nightly: move commits you already made off the machine. Never stages or
+# commits; review and commit by hand, this only reports and pushes.
+
+report() {
+  local dir=$1 dirty ahead
   [[ -d "$dir/.git" ]] || return 0
-  git -C "$dir" add -A
-  git -C "$dir" diff --cached --quiet && return 0
-  git -C "$dir" commit -m "$message" >/dev/null
-  printf 'saved %s\n' "$dir"
+  dirty=$(git -C "$dir" status --porcelain | wc -l)
+  ahead=$(git -C "$dir" rev-list --count '@{upstream}..HEAD' 2>/dev/null || echo "?")
+  printf '%s: %s uncommitted, %s unpushed\n' "$dir" "$dirty" "$ahead"
 }
 
-commit_repo "$HOME/code/personal/dotfiles" "chore: save desktop configuration"
-commit_repo "$HOME/org" "chore: save org vault"
+report "$HOME/code/personal/dotfiles"
+report "$HOME/org"
 
-# The vault has a private remote; dotfiles is public and stays a manual push.
+# The vault's remote is private; dotfiles is public, so its push stays manual.
 git -C "$HOME/org" push --quiet origin HEAD || printf 'push failed %s\n' "$HOME/org" >&2
