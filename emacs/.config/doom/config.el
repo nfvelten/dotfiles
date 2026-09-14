@@ -110,8 +110,16 @@ Daily notes are picked by the date in their filename (dd-mm-yyyy.org), not mtime
                                                  (string-to-number (match-string 2 f))
                                                  (string-to-number (match-string 3 f)))))))
       (directory-files-recursively (nf/org-file "Daily Notes") "\\.org\\'"))
-     (directory-files (nf/org-file "Pessoal/Projetos") t "\\.org\\'")
-     (directory-files (nf/org-file "Trabalho/Air/Demandas/Em Desenvolvimento") t "\\.org\\'"))))
+     (seq-remove #'nf/archived-p
+                 (append
+                  (directory-files (nf/org-file "Pessoal/Projetos") t "\\.org\\'")
+                  (directory-files (nf/org-file "Trabalho/Air/Demandas/Em Desenvolvimento") t "\\.org\\'"))))))
+
+(defun nf/archived-p (file)
+  "Non-nil when FILE's #+filetags include :arquivado:."
+  (with-temp-buffer
+    (insert-file-contents file nil 0 2000)
+    (re-search-forward "^#\\+filetags:.*:arquivado:" nil t)))
 
 (defun nf/refresh-agenda-files (&rest _)
   (setq org-agenda-files (nf/agenda-files)))
