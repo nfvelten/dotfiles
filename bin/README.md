@@ -11,7 +11,7 @@ These scripts are installed into `~/.local/bin` by GNU Stow.
 - `scratchwork` — toggle the work scratchpad
 - `scratchspotify` — toggle the Spotify scratchpad
 - `scratchtmux` — toggle the tmux and Org scratchpad
-- `scratchpad-center` — center a scratchpad window
+- `scratchpad-center` — resize and center a scratchpad for its monitor
 - `librewolf-themed` — launch LibreWolf with the current theme
 
 ## Work

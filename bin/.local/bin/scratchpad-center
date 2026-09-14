@@ -1,15 +1,20 @@
 #!/bin/bash
-# Re-center a scratchpad after it is toggled into view.
+# Resize and re-center a scratchpad after it is toggled into view.
 #
-# Window rules run `center` only at map time, so a scratchpad opened on one
-# monitor keeps those coordinates when its special workspace is later shown
-# on a monitor with a different logical size.
+# Window rules run `size` and `center` only at map time, so a scratchpad opened
+# on one monitor keeps that size and those coordinates when its special
+# workspace is later shown on a monitor with a different logical size.
 #
 # Guarded on the active window title: toggle_special also *hides*, and in that
 # case the active window is a normal one that must not be moved.
 
 title="$1"
 
-[[ "$(hyprctl activewindow -j | jq -r '.title // empty')" == "$title" ]] || exit 0
+window=$(hyprctl activewindow -j)
+[[ "$(jq -r '.title // empty' <<<"$window")" == "$title" ]] || exit 0
 
+read -r width height < <(hyprctl monitors -j | jq -r --argjson id "$(jq '.monitor' <<<"$window")" \
+    '.[] | select(.id == $id) | "\(.width / .scale * 0.8 | floor) \(.height / .scale * 0.79 | floor)"')
+
+hyprctl eval "hl.dispatch(hl.dsp.window.resize({ x = $width, y = $height, window = \"title:^$title\$\" }))" >/dev/null
 hyprctl eval 'hl.dispatch(hl.dsp.window.center())' >/dev/null
