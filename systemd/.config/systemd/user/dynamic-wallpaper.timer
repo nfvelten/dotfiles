@@ -1,11 +1,9 @@
 [Unit]
-Description=Run dynamic wallpaper near hour transitions
+Description=Update the desktop wallpaper by time of day
 
 [Timer]
-OnCalendar=*-*-* *:00:00
-OnCalendar=*-*-* *:55..59:00
-OnStartupSec=60s
-Persistent=true
+OnBootSec=5s
+OnCalendar=hourly
 
 [Install]
 WantedBy=timers.target

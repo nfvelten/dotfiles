@@ -1,0 +1,6 @@
+[Unit]
+Description=Apply the desktop theme for the current time
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/desktop-theme-auto

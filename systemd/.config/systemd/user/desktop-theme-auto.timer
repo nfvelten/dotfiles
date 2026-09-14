@@ -1,0 +1,9 @@
+[Unit]
+Description=Keep the desktop theme aligned with daylight
+
+[Timer]
+OnBootSec=5s
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Desktop wallpaper compositor
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/swaybg -i %h/.local/state/desktop/background -m fill
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

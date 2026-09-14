@@ -1,0 +1,12 @@
+[Unit]
+Description=Emacs daemon
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/emacs --fg-daemon=default
+ExecStop=/usr/bin/emacsclient --eval "(kill-emacs)"
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
