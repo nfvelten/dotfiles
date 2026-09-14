@@ -20,13 +20,4 @@ return {
       end, opts.ensure_installed or {})
     end,
   },
-  {
-    "mfussenegger/nvim-lint",
-    opts = function(_, opts)
-      opts.linters = opts.linters or {}
-      opts.linters["markdownlint-cli2"] = {
-        args = { "--config", vim.fn.expand("~/amphora/.markdownlint.jsonc"), "$FILENAME" },
-      }
-    end,
-  },
 }
