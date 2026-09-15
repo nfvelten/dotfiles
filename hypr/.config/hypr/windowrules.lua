@@ -307,3 +307,11 @@ hl.window_rule({
     },
     center = true,
 })
+
+-- Blur the desktop behind the open Yerba menu.
+hl.layer_rule({
+    name = "yerba_menu_blur",
+    match = { namespace = "^yerba-menu$" },
+    blur = true,
+    ignore_alpha = 0,
+})

@@ -6,6 +6,9 @@ import "Actions.js" as Actions
 PanelWindow {
     id: panel
     signal closeRequested()
+    signal toggleTopBarRequested()
+    required property bool showTopBar
+    required property string time
     required property QtObject theme
     required property QtObject notifications
     property bool isOpen: false
@@ -21,6 +24,7 @@ PanelWindow {
     function activate(index) {
         var item = rows[index]
         if (!item) return
+        if (item.toggleTopBar) { panel.toggleTopBarRequested(); return }
         if (item.notificationAction) {
             if (item.notificationAction === "dnd") notifications.toggleDnd()
             if (item.notificationAction === "clear") notifications.clearHistory()
@@ -38,6 +42,12 @@ PanelWindow {
         var q = query.toLowerCase().trim()
         if (pending) return [{title: "Cancel", cancel: true}, {title: "Confirm " + pending.title, command: pending.command}]
         var source = route === "power" ? Actions.power() : Actions.all()
+        if (route === "main") source = source.concat([{
+            title: "Mostrar barra superior: " + (panel.showTopBar ? "Ligado" : "Desligado"),
+            keywords: "topbar bar dock painel desktop toggle",
+            icon: "preferences-desktop-display",
+            toggleTopBar: true
+        }])
         var notificationActions = [
             {title: "Do not disturb: " + (notifications.dnd ? "On" : "Off"), keywords: "Toggle notification popups", notificationAction: "dnd"},
             {title: "Notification history", keywords: "Recent notifications from this session", notificationAction: "history"},
@@ -51,7 +61,7 @@ PanelWindow {
 
     visible: panel.isOpen
     anchors { top: true; left: true; right: true; bottom: true }
-    color: "transparent"
+    color: "#52000000"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "yerba-menu"
     WlrLayershell.keyboardFocus: panel.isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
@@ -62,10 +72,21 @@ PanelWindow {
         onClicked: panel.closeRequested()
     }
 
+    StatusStrip {
+        visible: !panel.showTopBar
+        theme: panel.theme
+        time: panel.time
+        anchors.bottom: dock.top
+        anchors.bottomMargin: 8
+        anchors.horizontalCenter: dock.horizontalCenter
+        width: dock.width
+        height: 34
+    }
+
     Rectangle {
         id: dock
         width: Math.min(740, parent.width - 32)
-        height: Math.min(parent.height - 48, 132 + Math.min(5, Math.max(1, panel.rows.length)) * 48)
+        height: Math.min(parent.height - (panel.showTopBar ? 48 : 132), 132 + Math.min(5, Math.max(1, panel.rows.length)) * 48)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
         radius: 7
