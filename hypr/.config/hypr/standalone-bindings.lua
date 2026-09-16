@@ -42,7 +42,7 @@ hl.bind("SUPER + SHIFT + N", hl.dsp.exec_cmd("ghostty -e nvim"))
 
 hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("ghostty -e btop"))
 
-hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd("ghostty -e emacsclient -nw --eval '(nf/daily-note)'"))
+hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/scratchematic"))
 
 hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd("spotify"))
 

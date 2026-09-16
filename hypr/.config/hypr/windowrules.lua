@@ -315,3 +315,14 @@ hl.layer_rule({
     blur = true,
     ignore_alpha = 0,
 })
+
+-- Daily note: tall right-side overlay (Super+Shift+O).
+hl.window_rule({
+    name = "emacs_daily_panel",
+    match = { title = "^__emacsnote$" },
+    workspace = "special:emacsnote silent",
+    float = true,
+    size = { "monitor_w*0.44", "monitor_h*0.90" },
+    move = { "monitor_w*0.56-28", "monitor_h*0.05" },
+    animation = "slide right",
+})
