@@ -18,10 +18,10 @@ hyprctl eval '
 window=$(hyprctl activewindow -j)
 [[ $(jq -r '.title // empty' <<<"$window") == __emacsnote ]] || exit 0
 # Recalculate geometry when toggled on another monitor.
-read -r width height dx dy < <(hyprctl monitors -j | jq -r --argjson win "$window" '
+read -r width height x y < <(hyprctl monitors -j | jq -r --argjson win "$window" '
     .[] | select(.id == $win.monitor) |
     (.width / .scale) as $w | (.height / .scale) as $h |
     ($w * 0.44 | floor) as $pw | ($h * 0.90 | floor) as $ph |
-    "\($pw) \($ph) \(.x + $w - $pw - 28 - $win.at[0] | floor) \(.y + ($h - $ph) / 2 - $win.at[1] | floor)"')
+    "\($pw) \($ph) \(.x + $w - $pw - 28 | floor) \(.y + ($h - $ph) / 2 | floor)"')
 hyprctl eval "hl.dispatch(hl.dsp.window.resize({x=$width,y=$height,window=\"title:^__emacsnote$\"}))" >/dev/null
-hyprctl eval "hl.dispatch(hl.dsp.window.move({x=$dx,y=$dy,window=\"title:^__emacsnote$\"}))" >/dev/null
+hyprctl eval "hl.dispatch(hl.dsp.window.move({x=$x,y=$y,relative=false,window=\"title:^__emacsnote$\"}))" >/dev/null
