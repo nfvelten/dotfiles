@@ -18,7 +18,7 @@ function all() {
 
 function power() {
     return [
-        { title: "Lock", command: "hyprlock" },
+        { title: "Lock", command: "loginctl lock-session" },
         { title: "Suspend", command: "systemctl suspend" },
         { title: "Reboot", command: "systemctl reboot", confirm: true },
         { title: "Power off", command: "systemctl poweroff", confirm: true }

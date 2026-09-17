@@ -18,6 +18,8 @@ ShellRoot {
     }
     property bool menuOpen: false
     property string now: Qt.formatDateTime(new Date(), "ddd HH:mm")
+    Lock { id: lockScreen }
+
 
     IpcHandler {
         target: "yerba"
@@ -28,6 +30,7 @@ ShellRoot {
         function closeMenu() { root.menuOpen = false }
     }
 
+        function lock() { root.menuOpen = false; lockScreen.locked = true }
     Notifications { id: notifications; theme: palette }
     Bar { visible: preferences.showTopBar; theme: palette; time: root.now; onMenuRequested: root.menuOpen = !root.menuOpen }
     Menu { id: menu; showTopBar: preferences.showTopBar; time: root.now; onToggleTopBarRequested: root.toggleTopBar(); notifications: notifications; theme: palette; isOpen: root.menuOpen; onCloseRequested: root.menuOpen = false }

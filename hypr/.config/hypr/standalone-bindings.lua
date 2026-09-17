@@ -108,7 +108,10 @@ hl.bind("SUPER + SHIFT + 5", hl.dsp.window.move({ workspace = 5 }))
 
 -- Desktop
 
-hl.bind("SUPER + CTRL + L", hl.dsp.exec_cmd("hyprlock"))
+hl.bind("SUPER + CTRL + L", hl.dsp.exec_cmd("loginctl lock-session"))
+
+-- Wake the display while the Quickshell lock surface is active.
+hl.bind("SUPER + CTRL + L", hl.dsp.exec_cmd("hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'"), { locked = true })
 
 hl.bind("SUPER + CTRL + W", hl.dsp.exec_cmd("ghostty -e nmtui"))
 

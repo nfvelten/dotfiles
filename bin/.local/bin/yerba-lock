@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Ask the running Quickshell session to create the secure lock surface.
+quickshell ipc call yerba lock
+
+# Blank the displays once the lock surface has had time to appear.
+(
+    sleep 3
+    hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })'
+) &
