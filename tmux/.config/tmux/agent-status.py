@@ -3,6 +3,16 @@
 import re
 import subprocess
 import sys
+import time
+
+SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+
+
+def spinner():
+    return '#[fg=yellow]' + SPINNER[int(time.time()) % len(SPINNER)]
+
+
+HOOK_STATES = {'working': spinner, 'waiting': lambda: '#[fg=yellow]!', 'idle': lambda: '#[fg=green]○'}
 
 
 def tmux(*args):
@@ -13,15 +23,19 @@ def indicator(screen, title):
     if re.search(r'(?i)press enter to confirm|do you want to proceed|would you like to|permission required|allow .*\?', screen):
         return '#[fg=yellow]!'
     if re.search(r'(?i)esc to interrupt|ctrl\+c to interrupt|esc to cancel', screen) or re.match(r'^[\u2800-\u28ff]', title):
-        return '#[fg=yellow]●'
+        return spinner()
     return '#[fg=green]○'
 
 
 def main():
     labels = []
-    for line in tmux('list-panes', '-t', sys.argv[1], '-F', '#{pane_id}\t#{pane_current_command}\t#{pane_title}').splitlines():
-        pane, command, title = line.split('\t', 2)
+    for line in tmux('list-panes', '-t', sys.argv[1], '-F', '#{pane_id}\t#{pane_current_command}\t#{@agent}\t#{pane_title}').splitlines():
+        pane, command, state, title = line.split('\t', 3)
         if command not in ('claude', 'codex'):
+            continue
+        # Claude Code hooks report state directly; screen scraping is the fallback (codex).
+        if state in HOOK_STATES:
+            labels.append(f'{HOOK_STATES[state]()}#[default]')
             continue
         screen = tmux('capture-pane', '-p', '-t', pane).rstrip()
         # Only the footer: old approval prompts may remain above the current turn.
