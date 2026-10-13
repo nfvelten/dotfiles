@@ -16,4 +16,7 @@ report "$HOME/code/personal/dotfiles"
 report "$HOME/org"
 
 # The vault's remote is private; dotfiles is public, so its push stays manual.
+git -C "$HOME/org" add -A
+git -C "$HOME/org" diff --cached --quiet ||
+  git -C "$HOME/org" commit --quiet -m "Vault: auto-sync $(date +%F)"
 git -C "$HOME/org" push --quiet origin HEAD || printf 'push failed %s\n' "$HOME/org" >&2
