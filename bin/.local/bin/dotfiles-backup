@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Nightly: move commits you already made off the machine. Never stages or
-# commits; review and commit by hand, this only reports and pushes.
+# Nightly: auto-commit and push the Org vault; dotfiles is only reported,
+# review and commit those by hand.
 
 report() {
   local dir=$1 dirty ahead
