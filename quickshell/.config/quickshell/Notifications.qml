@@ -10,20 +10,33 @@ Scope {
     required property QtObject theme
     property bool historyOpen: false
     readonly property bool dnd: memory.dnd
+    readonly property var historyEntries: JSON.parse(memory.historyJson || "[]")
     // Bounded session history; text snapshots never retain dead notification objects.
     PersistentProperties {
         id: memory
         reloadableId: "yerba-notifications"
         property bool dnd: false
-        property var history: []
+        property string historyJson: "[]"
+        property double seenAt: 0
     }
+    readonly property double seenAt: memory.seenAt
+    function markSeen() { memory.seenAt = Date.now() }
     function record(n) {
         if (n.transient) return
-        var entry = {id: n.id, app: n.appName, title: n.summary, body: n.body, critical: n.urgency === NotificationUrgency.Critical}
-        memory.history = [entry].concat(memory.history.filter(function(e) { return e.id !== n.id })).slice(0, 10)
+        var entry = {id: n.id, app: n.appName, title: n.summary, body: n.body, critical: n.urgency === NotificationUrgency.Critical, time: Date.now()}
+        memory.historyJson = JSON.stringify([entry].concat(service.historyEntries.filter(function(e) { return e.id !== n.id })).slice(0, 10))
+    }
+    function invokeAction(n, index) {
+        if (n && n.actions[index]) n.actions[index].invoke()
+    }
+    function invokeDefault(n) {
+        if (!n) return
+        for (var i = 0; i < n.actions.length; i++) {
+            if (n.actions[i].identifier === "default") { invokeAction(n, i); return }
+        }
     }
     function toggleDnd() { memory.dnd = !memory.dnd }
-    function clearHistory() { memory.history = [] }
+    function clearHistory() { memory.historyJson = "[]" }
     NotificationServer {
         id: server
         keepOnReload: true
@@ -39,11 +52,13 @@ Scope {
     }
     IpcHandler {
         target: "notifications"
-        function status(): string { return JSON.stringify({dnd: memory.dnd, active: server.trackedNotifications.values.length, history: memory.history.length, historyOpen: service.historyOpen}) }
+        function status(): string { return JSON.stringify({dnd: memory.dnd, active: server.trackedNotifications.values.length, history: service.historyEntries.length, historyOpen: service.historyOpen}) }
         function toggleDnd(): string { service.toggleDnd(); return memory.dnd ? "on" : "off" }
         function showHistory() { service.historyOpen = true }
         function closeHistory() { service.historyOpen = false }
         function clearHistory() { service.clearHistory() }
+        function invokeLast() { var entries = server.trackedNotifications.values; service.invokeDefault(entries[entries.length - 1]) }
+        function dismissOne() { var entries = server.trackedNotifications.values; if (entries.length) entries[entries.length - 1].dismiss() }
         function dismissAll() { server.trackedNotifications.values.slice().forEach(function(n) { n.dismiss() }) }
     }
     PanelWindow {
@@ -78,12 +93,8 @@ Scope {
                     critical: modelData.urgency === NotificationUrgency.Critical
                     actions: modelData.actions
                     onDismissRequested: modelData.dismiss()
-                    onActionRequested: function(i) { if (modelData.actions[i]) modelData.actions[i].invoke() }
-                    onDefaultRequested: {
-                        for (var i = 0; i < modelData.actions.length; i++) {
-                            if (modelData.actions[i].identifier === "default") { modelData.actions[i].invoke(); return }
-                        }
-                    }
+                    onActionRequested: function(i) { service.invokeAction(modelData, i) }
+                    onDefaultRequested: service.invokeDefault(modelData)
                     property int remaining: modelData.expireTimeout > 0 ? modelData.expireTimeout : 8000
                     property double startedAt: 0
                     function restartLifetime() {
@@ -113,6 +124,7 @@ Scope {
                     Connections {
                         target: toast.modelData
                         function onSummaryChanged() { service.record(toast.modelData); toast.restartLifetime() }
+                        function onExpireTimeoutChanged() { toast.restartLifetime() }
                         function onBodyChanged() { service.record(toast.modelData); toast.restartLifetime() }
                     }
                 }
@@ -138,19 +150,28 @@ Scope {
             focus: true
             Keys.onEscapePressed: service.historyOpen = false
             Text { x: 16; y: 16; text: "Notifications · Session history"; color: service.theme.foreground; font.pixelSize: 15 }
-            Text { anchors.right: parent.right; anchors.rightMargin: 16; y: 18; text: "Esc close"; color: service.theme.foreground; opacity: 0.6; font.pixelSize: 11 }
+            Row {
+                anchors.right: parent.right; anchors.rightMargin: 16; y: 12; spacing: 6
+                Rectangle {
+                    width: clearLabel.implicitWidth + 16; height: 26; radius: 4
+                    color: clearMouse.containsMouse ? service.theme.surface : "transparent"
+                    Text { id: clearLabel; anchors.centerIn: parent; text: "Clear"; color: service.theme.foreground; font.pixelSize: 11 }
+                    MouseArea { id: clearMouse; anchors.fill: parent; hoverEnabled: true; onClicked: service.clearHistory() }
+                }
+                Text { anchors.verticalCenter: parent.verticalCenter; text: "Esc close"; color: service.theme.foreground; opacity: 0.6; font.pixelSize: 11 }
+            }
             ListView {
                 anchors.fill: parent; anchors.margins: 12; anchors.topMargin: 50
                 spacing: 8; clip: true; focus: true
-                model: memory.history
+                model: service.historyEntries
                 delegate: NotificationCard {
                     required property var modelData
                     width: ListView.view.width
                     theme: service.theme
                     title: modelData.title; body: modelData.body; app: modelData.app; critical: modelData.critical
-                    onDismissRequested: memory.history = memory.history.filter(function(e) { return e.id !== modelData.id })
+                    onDismissRequested: memory.historyJson = JSON.stringify(service.historyEntries.filter(function(e) { return e.id !== modelData.id }))
                 }
-                Text { anchors.centerIn: parent; visible: memory.history.length === 0; text: "No notifications yet"; color: service.theme.foreground; opacity: 0.65 }
+                Text { anchors.centerIn: parent; visible: service.historyEntries.length === 0; text: "No notifications yet"; color: service.theme.foreground; opacity: 0.65 }
             }
         }
     }

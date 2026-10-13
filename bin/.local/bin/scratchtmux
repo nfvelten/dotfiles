@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -u
 
+show_only=false
 session=org-agents
+if [[ ${1:-} == --show ]]; then
+    show_only=true
+    session=${2:-org-agents}
+    tmux has-session -t "$session" 2>/dev/null || exit 1
+fi
 org="$HOME/org"
 
 if ! tmux has-session -t "$session" 2>/dev/null; then
@@ -12,11 +18,15 @@ if ! tmux has-session -t "$session" 2>/dev/null; then
 fi
 
 if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:scratchtmux")' >/dev/null 2>&1; then
-    "$HOME/.local/bin/hypr-toggle-special" scratchtmux
+    if ! $show_only || ! hyprctl monitors -j | jq -e '.[] | select(.specialWorkspace.name == "special:scratchtmux")' >/dev/null; then
+        "$HOME/.local/bin/hypr-toggle-special" scratchtmux
+    fi
     "$HOME/.local/bin/scratchpad-center" __scratchtmux
 else
     ghostty --title=__scratchtmux -e tmux attach-session -t "$session" >/dev/null 2>&1 &
     sleep 0.5
-    "$HOME/.local/bin/hypr-toggle-special" scratchtmux
+    if ! $show_only || ! hyprctl monitors -j | jq -e '.[] | select(.specialWorkspace.name == "special:scratchtmux")' >/dev/null; then
+        "$HOME/.local/bin/hypr-toggle-special" scratchtmux
+    fi
     "$HOME/.local/bin/scratchpad-center" __scratchtmux
 fi

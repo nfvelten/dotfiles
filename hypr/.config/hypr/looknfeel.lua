@@ -28,11 +28,15 @@ hl.config({
         rounding = 8,
         active_opacity = 1.0,
         inactive_opacity = 0.85,
+        -- Scratchpads (Super + C, Super + Shift + O…) get the same blurred, dimmed backdrop as the
+        -- Yerba dock (#52000000 ≈ 0.32), so going dock -> scratchpad keeps the background unchanged.
+        dim_special = 0.32,
         blur = {
             enabled = true,
             size = 6,
             passes = 2,
             vibrancy = 0.15,
+            special = true,
         },
         shadow = {
             enabled = true,

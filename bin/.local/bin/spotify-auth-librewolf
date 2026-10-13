@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+
+spotify_player authenticate > >(tee "$tmp") 2>&1 &
+auth_pid=$!
+
+for _ in $(seq 1 80); do
+    if url=$(sed -n 's/^Browse to: //p' "$tmp" | head -n 1) && [[ -n "$url" ]]; then
+        setsid -f librewolf --new-window "$url"
+        break
+    fi
+    if ! kill -0 "$auth_pid" 2>/dev/null; then
+        wait "$auth_pid" || true
+        exit 1
+    fi
+    sleep 0.1
+done
+
+wait "$auth_pid"

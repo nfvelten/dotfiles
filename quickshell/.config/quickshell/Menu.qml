@@ -8,23 +8,308 @@ PanelWindow {
     signal closeRequested()
     signal toggleTopBarRequested()
     required property bool showTopBar
+    required property QtObject buttonPreferences
     required property string time
     required property QtObject theme
+    required property QtObject org
+    required property QtObject clipboard
     required property QtObject notifications
+    required property QtObject feed
+    required property QtObject media
     property bool isOpen: false
     property string query: ""
     property string route: "main"
     property var pending: null
+    property var contextItem: null
+    property string captureText: ""
+    readonly property bool dashboardVisible: route === "main" && !query.trim() && !contextItem && !pending
+    readonly property bool fullView: isFullViewRoute(route)
+    function isFullViewRoute(value) {
+        return ["tmux", "controls", "audio", "bluetooth", "network", "calendar", "media", "boards", "preferences", "themes"].indexOf(value) >= 0
+    }
+    function dockHeight(containerHeight) {
+        var available = containerHeight - (panel.showTopBar ? 48 : 132)
+        if (panel.dashboardVisible) {
+            var contentHeight = dashboardLoader.item ? dashboardLoader.item.implicitHeight : 200
+            return Math.min(available, Math.min(610, contentHeight + 102))
+        }
+        if (panel.route === "boards") {
+            var detail = boardsLoader.item && boardsLoader.item.detailMode
+            var listHeight = 180 + Math.max(1, panel.feed.azure.items.length) * 58
+            return Math.min(available, detail ? 610 : Math.min(610, listHeight))
+        }
+        if (panel.fullView) return Math.min(available, 610)
+        if (panel.route === "capture") return Math.min(available, 290)
+        if (panel.route === "clipboard") return Math.min(available, 440)
+        return Math.min(available, 132 + Math.min(5, Math.max(1, panel.rows.length)) * 48)
+    }
+    function searchPlaceholder() {
+        if (search.activeFocus) {
+            if (["audio", "bluetooth", "network", "controls"].indexOf(panel.route) >= 0)
+                return panel.route === "audio" ? "Audio" : panel.route === "bluetooth" ? "Bluetooth" : panel.route === "network" ? "Network" : "System controls"
+            if (panel.route === "notes") return "Search Org notes…"
+            if (panel.route === "clipboard") return "Search clipboard…"
+            return "Notes, apps and actions…"
+        }
+        var labels = {
+            notes: "Search Org notes", clipboard: "Search clipboard", applications: "Search apps",
+            tmux: "Filter tmux windows", audio: "Audio", bluetooth: "Bluetooth",
+            network: "Network", controls: "System controls"
+        }
+        return "/  " + (labels[panel.route] || "Search notes, apps and actions")
+    }
+    function sectionTitle() {
+        if (panel.route === "tmux") return "tmux sessions and windows"
+        if (panel.contextItem) return "Actions · " + panel.contextItem.title
+        if (panel.route === "notes") return "Org notes"
+        if (panel.pending) return "Confirmation"
+        if (panel.route === "clipboard") return "Clipboard"
+        if (panel.route === "applications") return "Applications"
+        if (panel.route === "main" && panel.query.trim()) return "Apps · Actions · Agents · Notes"
+        return "Commands"
+    }
+    function footerHint() {
+        if (panel.route === "calendar") return "hjkl day/week    [ ] month    g today    J K event    ? keys"
+        if (panel.route === "media") return "↑ ↓ select    Enter play    / search    u queue    r recent    ? keys"
+        if (panel.route === "boards") return "↑ ↓ select    Enter/o details    r refresh    Esc back"
+        if (panel.route === "tmux") return "j k select    Enter/e resume in Super + C    ? keys"
+        if (panel.route === "preferences") return "j k select    Enter toggle    ? keys    Esc back"
+        if (panel.route === "themes") return "↑ ↓ select    Enter apply    Esc back"
+        if (["controls", "audio", "bluetooth", "network"].indexOf(panel.route) >= 0)
+            return (controlsLoader.item && controlsLoader.item.message) || "j k item    Enter toggle    - + volume    ? keys"
+        if (panel.org.tmux.error) return panel.org.tmux.error
+        if (panel.org.tmux.busy) return "Resuming session…"
+        if (panel.dashboardVisible && !panel.org.error && !panel.org.message)
+            return search.activeFocus ? "Type to search · Esc keys" : "/ search    ? keys    q close"
+        if (panel.route === "capture" && !panel.org.error && !panel.org.busy) return "Enter save    Esc back"
+        if (panel.org.busy) return "Please wait…"
+        if (panel.org.error) return panel.org.error
+        if (panel.org.message) return panel.org.message
+        if (search.activeFocus) return "↑ ↓ select    Enter open    Esc keys"
+        return "j k select    Enter " + (panel.route === "clipboard" ? "copy" : "open") + "    / search    Backspace back    ? keys"
+    }
+    function openTmuxItem(item) {
+        panel.route = "tmux"
+        panel.query = ""
+        panel.selected = Math.max(0, panel.rows.findIndex(function(row) { return row.tmuxWindow === item.tmuxWindow }))
+    }
+    function itemKind(item) {
+        if (item.tmuxWindow) return "tmux"
+        if (item.orgPath) return "Org"
+        if (item.clipboardId) return item.kind
+        if (item.desktopId) return "App"
+        if (item.route) return "Menu"
+        return "Action"
+    }
+    function emptyMessage() {
+        if (panel.route === "clipboard" && panel.clipboard.loading) return "Loading clipboard…"
+        if (panel.route === "clipboard" && panel.clipboard.error) return panel.clipboard.error
+        if (panel.org.loading) return "Searching notes…"
+        if (panel.route === "tmux") return panel.org.tmux.loading ? "Loading sessions…" : "No open tmux sessions"
+        return "No results"
+    }
+    function homeRows() {
+        if (!org) return []
+        var recent = org.pins.concat(org.home.recent.filter(function(r) { return !org.pins.some(function(p) { return p.orgPath === r.orgPath }) })).slice(0, 3)
+        var rows = recent.map(function(r) {
+            return Object.assign({}, r, {group: "CONTINUAR", label: "Org", hint: org.pinned(r) ? "pinned" : "recently edited"})
+        })
+        rows.push({title: "Today's note", hint: org.home.taskCount + " open", label: "Today", group: "HOJE", orgAction: "today"})
+        org.home.tasks.slice(0, 2).forEach(function(r) { rows.push(Object.assign({}, r, {group: "HOJE", label: "□", hint: "task"})) })
+        rows.push({title: "Capture task", hint: "daily note", label: "+", group: "ATALHOS", route: "capture"})
+        rows.push({title: "Audio", hint: "volume and devices", label: "c", group: "ATALHOS", route: "audio"})
+        rows.push({title: "Bluetooth", hint: "devices", label: "B", group: "ATALHOS", route: "bluetooth"})
+        rows.push({title: "Network", hint: "Wi-Fi and Ethernet", label: "w", group: "ATALHOS", route: "network"})
+        return rows
+    }
+    onQueryChanged: { if (org) org.search((route === "main" || route === "notes") ? query : "") }
     property int selected: 0
     readonly property var rows: filtered()
     onIsOpenChanged: {
-        if (isOpen) { query = ""; selected = 0; search.forceActiveFocus() }
-        else { route = "main"; pending = null }
+        if (!org || !clipboard) return
+        if (isOpen) {
+            org.error = ""; org.message = ""; openRefresh.restart()
+            query = ""; selected = 0; helpVisible = false
+            Qt.callLater(keyFocus); Qt.callLater(function() { results.positionViewAtBeginning() })
+        } else {
+            morph = null; morphItem = null; morphAction = null; contextItem = null
+            route = "main"; pending = null; clipboard.requestPreview(""); org.tmux.preview(null)
+        }
+    }
+    Component.onCompleted: { if (isOpen) { org.refresh(); keyFocus() } }
+    onRouteChanged: {
+        Qt.callLater(updatePreview)
+        contextItem = null
+        if (org) org.search((route === "main" || route === "notes") ? query : "")
+        if (route === "tmux" && isOpen) org.tmux.refresh()
+        if (route === "clipboard" && isOpen) clipboard.refresh()
+        helpVisible = false
+        Qt.callLater(searchRoutes.indexOf(route) >= 0 ? focusSearch : keyFocus)
+    }
+    Timer { id: openRefresh; interval: 180; repeat: false; onTriggered: { if (!panel.isOpen) return; org.refresh(); if (panel.route === "clipboard") clipboard.refresh() } }
+    Binding { when: !!panel.org; target: panel.org ? panel.org.tmux : null; property: "live"; value: panel.isOpen && (panel.dashboardVisible || panel.route === "tmux") }
+    Connections {
+        target: panel.clipboard
+        function onCopied() { if (panel.route === "clipboard") panel.closeRequested() }
+    }
+    Connections {
+        target: panel.feed
+        function onOpenTmux(item) { panel.openTmuxItem(item) }
+        function onNavigate(destination) { panel.navigate(destination) }
+    }
+    function updatePreview() {
+        var item = rows[selected]
+        if (org) org.tmux.preview(isOpen && route === "tmux" && item ? item : null)
+        if (clipboard) clipboard.requestPreview(isOpen && route === "clipboard" && item ? item.clipboardId || "" : "")
+    }
+    onSelectedChanged: updatePreview()
+    onRowsChanged: updatePreview()
+    function openControls(column) {
+        controlsColumn = column
+        route = "controls"; query = ""
+    }
+    function navigate(destination) {
+        if (destination === "controls") { openControls(0); return }
+        if (destination === "audio") controlsColumn = 0
+        else if (destination === "bluetooth") controlsColumn = 1
+        else if (destination === "network") controlsColumn = 2
+        route = destination; query = ""; selected = 0
+    }
+    // Gambito-style focus: the dock opens in key mode; / or i moves to search. Search-centric pages focus search on entry.
+    readonly property var searchRoutes: ["notes", "applications", "clipboard"]
+    property bool helpVisible: false
+    property int controlsColumn: 0
+    function focusSearch() { search.forceActiveFocus() }
+    function keyFocus() {
+        if (!isOpen) return
+        if (dashboardVisible) { if (dashboardLoader.item) dashboardLoader.item.forceActiveFocus() }
+        else if (route === "controls" || route === "audio" || route === "bluetooth" || route === "network") { if (controlsLoader.item) controlsLoader.item.forceActiveFocus() }
+        else if (route === "calendar") { if (calendarLoader.item) calendarLoader.item.forceActiveFocus() }
+        else if (route === "media") { if (mediaLoader.item) mediaLoader.item.forceActiveFocus() }
+        else if (route === "boards") { if (boardsLoader.item) boardsLoader.item.forceActiveFocus() }
+        else if (route === "preferences") { if (preferencesLoader.item) preferencesLoader.item.forceActiveFocus() }
+        else if (route === "themes") { if (themesLoader.item) themesLoader.item.forceActiveFocus() }
+        else if (route === "capture") return
+        else listKeys.forceActiveFocus()
+    }
+    function helpRows() {
+        var all = [
+            ["/  i", "Search"], ["?", "These keys"], ["Backspace", "Back one level"],
+            ["Esc", "Cancel / back"], ["q", "Close the dock"]
+        ]
+        if (dashboardVisible) {
+            var dashboard = [
+                ["n", "Capture task"], ["d", "Today's note"], ["s", "Dock preferences"],
+                ["o", "Notes"], ["t", "Agents · tmux"], ["C", "Calendar"], ["c", "Audio"],
+                ["B", "Bluetooth"], ["w", "Network"], ["v", "Clipboard"],
+                ["a", "Applications"], ["P", "Power"]
+            ]
+            return all.concat(dashboard).concat(feed.cards.map(function(c) { return [c.key, c.title] }))
+        }
+        if (route === "calendar") return all.concat([["hjkl ←↓↑→", "Day / week"], ["[  ]", "Month"], ["g", "Today"], ["J  K", "Select event"]])
+        if (route === "media") return all.concat([
+            ["Space", "Play / pause"], ["←  →", "Previous / next"], ["s", "Shuffle"],
+            ["u", "Queue"], ["r", "Recently played"], ["Click", "Seek"], ["Esc", "Back"]
+        ])
+        if (route === "boards") return all.concat([
+            ["j  k  ↓↑", "Select demand"], ["Enter  o", "Details / open in Azure"],
+            ["r", "Refresh"], ["Esc", "Back"]
+        ])
+        if (route === "preferences") return all.concat([["j  k  ↓↑", "Select"], ["Enter  Space", "Toggle"], ["Esc", "Back"]])
+        if (["controls", "audio", "bluetooth", "network"].indexOf(route) >= 0) return all.concat([
+            ["j  k", "Item"], ["Enter  Space", "Toggle / select"], ["-  +", "Volume"],
+            ["m", "Mute"], ["a", "Advanced (TUI)"]
+        ])
+        return all.concat([["j  k  ↓↑", "Select"], ["g  G", "First / last"], ["Enter  e", route === "tmux" ? "Resume in Super + C" : "Open"], ["Ctrl+K", "Context actions"]])
+    }
+    // Resume a tmux window by turning the dock into the Super + C scratchpad: the dock's
+    // rect moves onto the window's exact geometry (scratchpad-center: 80% × 79%, centered),
+    // then the window is shown underneath without Hyprland's slide and the dock fades out.
+    property var morph: null
+    property var morphItem: null
+    property var morphAction: null
+    // Set while jumping straight to a rect (scratchpad -> dock starts at the window, not animated there).
+    property bool morphInstant: false
+    property bool transitionOnly: false
+    // Dock -> rect: animate onto it, then run `action` (show the window underneath).
+    function morphInto(rect, action) {
+        if (morph) return
+        morphAction = action
+        morph = rect
+        morphTimer.restart()
+    }
+    // Rect -> dock: appear exactly over the scratchpad's window; morphRelease() animates back.
+    // Stays instant until the release: the closed window is 0×0, so the centering offsets jump
+    // when it maps and must not animate (that slid the dock in from the bottom-right corner).
+    function morphFrom(rect) {
+        morphInstant = true
+        morph = rect
+    }
+    function morphRelease() { morphInstant = false; morph = null; morphItem = null }
+    function morphToTmux(item) {
+        if (org.tmux.busy || morph) return
+        var top = showTopBar ? 40 : 0, w = Math.floor(width * 0.8), h = Math.floor(height * 0.79)
+        morphItem = item
+        if (!panel.buttonPreferences.tmuxMorph) { panel.org.tmux.open(item, false); panel.closeRequested(); return }
+        morphInto({x: Math.round((width - w) / 2), y: Math.round(top + (height - top - h) / 2), w: w, h: h}, function() { panel.org.tmux.open(item, true) })
+    }
+    Timer { id: morphTimer; interval: 230; onTriggered: { if (panel.morphAction) panel.morphAction() } }
+    function goBack() {
+        if (contextItem) { contextItem = null; selected = 0; return }
+        pending = null
+        route = "main"
+        query = ""
+        selected = 0
+        Qt.callLater(keyFocus)
+    }
+    readonly property var applicationCatalog: applicationRows()
+    function applicationRows() {
+        return DesktopEntries.applications.values.map(function(entry) {
+            var keywords = [entry.genericName, entry.comment, entry.id].concat(Array.from(entry.keywords)).join(" ")
+            return {
+                searchText: (entry.name + " " + keywords).toLowerCase(),
+                title: entry.name,
+                subtitle: entry.genericName || entry.comment || entry.id,
+                keywords: keywords,
+                icon: entry.icon,
+                desktopId: entry.id
+            }
+        }).sort(function(a, b) { return a.title.localeCompare(b.title) })
     }
     function activate(index) {
         var item = rows[index]
         if (!item) return
+        if (item.tmuxWindow) { morphToTmux(item); return }
+        if (item.tmuxAction) {
+            var tmuxItem = contextItem
+            if (item.tmuxAction === "resume") { contextItem = null; morphToTmux(tmuxItem); return }
+            if (item.tmuxAction === "directory" && tmuxItem.panePath) {
+                Quickshell.execDetached({command: ["ghostty", "-e", "yazi", tmuxItem.panePath]})
+                panel.closeRequested(); return
+            }
+            if (item.tmuxAction === "filter") { contextItem = null; route = "tmux"; query = tmuxItem.sessionName; selected = 0; return }
+        }
+        if (item.noteAction) {
+            var note = contextItem
+            if (item.noteAction === "pin") org.togglePin(note)
+            else org.run(item.noteAction, [note.orgPath, String(note.orgLine)])
+            contextItem = null; selected = 0
+            return
+        }
+        if (item.orgPath) { org.run("open", [item.orgPath, String(item.orgLine)]); return }
+        if (item.orgAction) { org.run(item.orgAction); return }
         if (item.toggleTopBar) { panel.toggleTopBarRequested(); return }
+        if (item.clipboardId) { clipboard.copyEntry(item.clipboardId); return }
+        if (item.desktopId) {
+            var entry = DesktopEntries.byId(item.desktopId)
+            if (!entry) return
+            var command = Array.from(entry.command)
+            if (!command.length) return
+            if (entry.runInTerminal) command = ["ghostty", "-e"].concat(command)
+            Quickshell.execDetached({command: command, workingDirectory: entry.workingDirectory})
+            panel.closeRequested()
+            return
+        }
         if (item.notificationAction) {
             if (item.notificationAction === "dnd") notifications.toggleDnd()
             if (item.notificationAction === "clear") notifications.clearHistory()
@@ -32,7 +317,15 @@ PanelWindow {
             return
         }
         if (item.cancel) { pending = null; return }
-        if (item.route) { route = item.route; query = ""; selected = 0; return }
+        if (item.controlsColumn !== undefined) { openControls(item.controlsColumn); return }
+        if (item.notesQuery !== undefined) { var q = item.notesQuery; route = "notes"; query = q; selected = 0; return }
+        if (item.route) {
+            route = item.route
+            if (route === "audio") controlsColumn = 0
+            else if (route === "bluetooth") controlsColumn = 1
+            else if (route === "network") controlsColumn = 2
+            query = ""; selected = 0; return
+        }
         if (item.confirm) { pending = item; query = ""; selected = 0; return }
         Quickshell.execDetached(["bash", "-lc", item.command])
         panel.closeRequested()
@@ -40,29 +333,98 @@ PanelWindow {
 
     function filtered() {
         var q = query.toLowerCase().trim()
+        if (contextItem) {
+            if (contextItem.tmuxWindow) return [
+                {title: "Resume in Super + C", tmuxAction: "resume"},
+                {title: "Open session directory", tmuxAction: "directory"},
+                {title: "Filter this session", tmuxAction: "filter"}
+            ]
+            return [
+                {title: "Open in Emacs", noteAction: "open"},
+                {title: "Copy Org link", noteAction: "link"},
+                {title: org.pinned(contextItem) ? "Unpin note" : "Pin note", noteAction: "pin"}
+            ]
+        }
+        if (dashboardVisible) return homeRows()
+        if (route === "capture") return []
+        if (route === "notes") return q ? org.entries : org.pins.concat(org.home.recent)
         if (pending) return [{title: "Cancel", cancel: true}, {title: "Confirm " + pending.title, command: pending.command}]
         var source = route === "power" ? Actions.power() : Actions.all()
-        if (route === "main") source = source.concat([{
-            title: "Mostrar barra superior: " + (panel.showTopBar ? "Ligado" : "Desligado"),
+        if (route === "tmux") source = org.tmux.entries
+        if (route === "main" || route === "actions") source = source.concat([{
+            title: "Show top bar: " + (panel.showTopBar ? "On" : "Off"),
             keywords: "topbar bar dock painel desktop toggle",
             icon: "preferences-desktop-display",
             toggleTopBar: true
         }])
         var notificationActions = [
-            {title: "Do not disturb: " + (notifications.dnd ? "On" : "Off"), keywords: "Toggle notification popups", notificationAction: "dnd"},
-            {title: "Notification history", keywords: "Recent notifications from this session", notificationAction: "history"},
-            {title: "Clear notification history", keywords: "Forget recent notifications", notificationAction: "clear"}
+            {
+                title: "Do not disturb: " + (notifications.dnd ? "On" : "Off"),
+                subtitle: "Suppress non-critical popups", keywords: "Toggle notification popups", notificationAction: "dnd"
+            },
+            {
+                title: "Notification history", subtitle: notifications.historyEntries.length + " saved this session",
+                keywords: "Recent notifications from this session", notificationAction: "history"
+            },
+            {
+                title: "Clear notification history", subtitle: "Remove saved notification entries",
+                keywords: "Forget recent notification entries", notificationAction: "clear"
+            }
         ]
         if (route === "notifications") source = notificationActions
         else if (q && route === "main") source = source.concat(notificationActions)
+        if (route === "clipboard") source = clipboard.entries
+        if (route === "applications") source = applicationCatalog
+        else if (q && route === "main") {
+            // Keep established actions (e.g. the scratch editor) ahead of same-name apps.
+            var actionNames = source.map(function(item) { return item.title.toLowerCase() })
+            source = source.concat(applicationCatalog.filter(function(item) {
+                return actionNames.indexOf(item.title.toLowerCase()) < 0
+            }))
+        }
         if (!q) return source
-        return source.filter(function (item) { return (item.title + " " + item.keywords).toLowerCase().indexOf(q) >= 0 })
+        var terms = q.split(/\s+/)
+        function rank(item) {
+            var title = item.title.toLowerCase()
+            return title === q ? 0 : title.indexOf(q) === 0 ? 1 : title.indexOf(q) >= 0 ? 2 : 3
+        }
+        var matches = source.filter(function(item) {
+            var text = item.searchText || (item.title + " " + (item.keywords || "")).toLowerCase()
+            return terms.every(function(term) { return text.indexOf(term) >= 0 })
+        }).sort(function(a, b) { return panel.route === "clipboard" ? 0 : rank(a) - rank(b) || a.title.localeCompare(b.title) })
+        if (route !== "main") return matches
+        // Apps and actions stay on top; notes arrive async and must not push them down.
+        var agents = org.tmux.entries.filter(function(item) {
+            var text = (item.title + " " + item.keywords).toLowerCase()
+            return terms.every(function(term) { return text.indexOf(term) >= 0 })
+        })
+        var notes = org.entries.slice(0, 5)
+        if (org.entries.length) notes.push({title: "Search all notes for “" + query.trim() + "”", subtitle: "Notes page · o", icon: "edit-find", notesQuery: query.trim()})
+        return matches.concat(agents).concat(notes)
+    }
+
+    Connections {
+        target: panel.feed
+        function onNavigate(destination) { panel.navigate(destination) }
+        function onOpenTmux(item) { panel.openTmuxItem(item) }
+        function onCloseRequested() { panel.closeRequested() }
+    }
+    Connections {
+        target: panel.org.tmux
+        function onOpened() { panel.closeRequested() }
+        function onErrorChanged() { if (panel.org.tmux.error) panel.morph = null }
+    }
+    Connections {
+        target: panel.org
+        function onOpened() { panel.closeRequested() }
+        function onCaptured() { panel.captureText = ""; panel.goBack() }
     }
 
     visible: panel.isOpen
     anchors { top: true; left: true; right: true; bottom: true }
+    exclusiveZone: -1
     color: "#52000000"
-    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "yerba-menu"
     WlrLayershell.keyboardFocus: panel.isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
@@ -73,9 +435,12 @@ PanelWindow {
     }
 
     StatusStrip {
-        visible: !panel.showTopBar
+        visible: !panel.showTopBar && !panel.transitionOnly
         theme: panel.theme
         time: panel.time
+        onControlsRequested: function(column) { panel.openControls(column) }
+        opacity: panel.morph ? 0 : 1
+        Behavior on opacity { enabled: !panel.morphInstant; NumberAnimation { duration: 120 } }
         anchors.bottom: dock.top
         anchors.bottomMargin: 8
         anchors.horizontalCenter: dock.horizontalCenter
@@ -85,10 +450,19 @@ PanelWindow {
 
     Rectangle {
         id: dock
-        width: Math.min(740, parent.width - 32)
-        height: Math.min(parent.height - (panel.showTopBar ? 48 : 132), 132 + Math.min(5, Math.max(1, panel.rows.length)) * 48)
+        Behavior on width { enabled: !panel.morphInstant; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on height { enabled: !panel.morphInstant; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on anchors.horizontalCenterOffset { enabled: !panel.morphInstant; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on anchors.verticalCenterOffset { enabled: !panel.morphInstant; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        width: panel.morph ? panel.morph.w : Math.min((panel.dashboardVisible || panel.fullView) ? 1060 : panel.route === "clipboard" ? 1040 : 740, parent.width - 32)
+        height: panel.morph ? panel.morph.h : panel.dockHeight(parent.height)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
+        // Centraliza o conjunto faixa de status + dock, não só o dock.
+        // Nos dois modos existe conteúdo reservado acima da dock: a top bar
+        // global ou a faixa de status interna. Centralize o conjunto abaixo.
+        anchors.verticalCenterOffset: panel.morph ? panel.morph.y + panel.morph.h / 2 - parent.height / 2 : 21
+        anchors.horizontalCenterOffset: panel.morph ? panel.morph.x + panel.morph.w / 2 - parent.width / 2 : 0
         radius: 7
         color: theme.background
         border.color: theme.border
@@ -97,10 +471,21 @@ PanelWindow {
 
         MouseArea { anchors.fill: parent }
         Rectangle {
-            width: parent.width - 2
-            height: 2
-            x: 1
-            color: theme.accent
+            visible: panel.transitionOnly
+            anchors.fill: parent
+            z: 100
+            radius: dock.radius
+            color: theme.background
+            border.color: theme.border
+            border.width: dock.border.width
+        }
+        // Morph cover: fade the dock content out while the scratchpad takes its rect.
+        Rectangle {
+            anchors.fill: parent; z: 20; radius: dock.radius
+            color: theme.background
+            opacity: panel.morph ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { enabled: !panel.morphInstant; NumberAnimation { duration: 140 } }
         }
         Item {
             id: header
@@ -110,7 +495,8 @@ PanelWindow {
             anchors.right: parent.right
             Text {
                 id: prefix
-                text: panel.route === "power" ? "Power" : "Open"
+                MouseArea { anchors.fill: parent; enabled: panel.route !== "main" || panel.contextItem !== null; onClicked: panel.goBack() }
+                text: panel.route === "main" && !panel.contextItem ? "⌕" : "‹ Back"
                 anchors.left: parent.left
                 anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
@@ -131,15 +517,25 @@ PanelWindow {
                 onTextChanged: { panel.query = text; panel.selected = 0 }
                 Text {
                     visible: !search.text
-                    text: "Search apps and actions"
+                    text: panel.searchPlaceholder()
                     color: theme.foreground
                     opacity: 0.6
                     font.pixelSize: 15
                 }
-                Keys.onEscapePressed: panel.closeRequested()
+                Keys.onPressed: function(event) {
+                    if (event.key === Qt.Key_K && (event.modifiers & Qt.ControlModifier)) {
+                        var item = panel.rows[panel.selected]
+                        if (item && item.orgPath) { panel.contextItem = item; panel.selected = 0 }
+                        event.accepted = true
+                    }
+                    if (event.key === Qt.Key_Left && (event.modifiers & Qt.AltModifier)) {
+                        panel.goBack()
+                        event.accepted = true
+                    }
+                }
+                Keys.onEscapePressed: { if (panel.query) panel.query = ""; panel.keyFocus() }
                 Keys.onDownPressed: panel.selected = Math.min(panel.rows.length - 1, panel.selected + 1)
                 Keys.onUpPressed: panel.selected = Math.max(0, panel.selected - 1)
-                Keys.onTabPressed: panel.selected = panel.rows.length ? (panel.selected + 1) % panel.rows.length : 0
                 Keys.onReturnPressed: panel.activate(panel.selected)
                 Keys.onEnterPressed: panel.activate(panel.selected)
             }
@@ -163,6 +559,7 @@ PanelWindow {
         }
         Item {
             id: section
+            visible: !panel.dashboardVisible && panel.route !== "capture" && !panel.fullView
             anchors.top: header.bottom
             width: parent.width
             height: 30
@@ -170,7 +567,7 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                text: panel.pending ? "Confirmation" : "Commands"
+                text: panel.sectionTitle()
                 color: theme.foreground
                 opacity: 0.6
                 font.pixelSize: 12
@@ -179,7 +576,7 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                text: panel.rows.length + " actions"
+                text: panel.rows.length + (panel.route === "applications" ? (panel.rows.length === 1 ? " app" : " apps") : (panel.rows.length === 1 ? " result" : " results"))
                 color: theme.foreground
                 opacity: 0.6
                 font.pixelSize: 12
@@ -187,10 +584,11 @@ PanelWindow {
         }
         ListView {
             id: results
+            visible: !panel.dashboardVisible && panel.route !== "capture" && !panel.fullView
             anchors.top: section.bottom
             anchors.bottom: footer.top
             anchors.left: parent.left
-            anchors.right: parent.right
+            anchors.right: panel.route === "clipboard" ? previewPane.left : parent.right
             anchors.margins: 8
             clip: true
             model: panel.rows
@@ -202,42 +600,370 @@ PanelWindow {
                 width: results.width
                 height: 48
                 radius: 4
-                color: index === panel.selected ? theme.surface : "transparent"
+                color: index === panel.selected ? Qt.alpha(theme.accent, 0.13) : "transparent"
                 Text {
                     x: 10
                     anchors.verticalCenter: parent.verticalCenter
-                    text: String(index + 1).padStart(2, "0")
+                    text: modelData.orgPath ? "·" : ""
                     color: theme.foreground
                     opacity: 0.55
                     font.family: "monospace"
                     font.pixelSize: 11
                 }
-                Column {
+                Item {
                     x: 36
+                    width: 24; height: 24
+                    anchors.verticalCenter: parent.verticalCenter
+                    Image {
+                        id: entryIcon
+                        anchors.fill: parent
+                        readonly property string iconName: modelData.icon || (modelData.notificationAction ? "preferences-system-notifications-symbolic" : "")
+                        source: !iconName ? "" : iconName.startsWith("/") ? "file://" + iconName : (Quickshell.iconPath(iconName, true) || Quickshell.iconPath("application-x-executable", true))
+                        sourceSize.width: 24; sourceSize.height: 24
+                        fillMode: Image.PreserveAspectFit
+                        visible: status === Image.Ready
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        visible: !entryIcon.visible
+                        text: modelData.title.charAt(0).toUpperCase()
+                        color: theme.foreground
+                        font.pixelSize: 16
+                    }
+                }
+                Column {
+                    x: 70
+                    width: parent.width - 150
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 3
-                    Text { text: modelData.title; color: theme.foreground; font.pixelSize: 14 }
+                    Text { width: parent.width; text: modelData.title; textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; font.pixelSize: 14 }
                     Text {
-                        text: modelData.keywords || (modelData.cancel ? "Return without changes" : "Session action")
+                        width: parent.width
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        text: modelData.subtitle || modelData.keywords || (modelData.cancel ? "Return without changes" : "Session action")
                         color: theme.foreground
                         opacity: 0.6
                         font.family: "monospace"
                         font.pixelSize: 11
                     }
                 }
+                Text {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: panel.itemKind(modelData)
+                    font.pixelSize: 11
+                    color: theme.foreground
+                    opacity: 0.6
+                }
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
-                    onPositionChanged: panel.selected = index
                     onClicked: panel.activate(index)
                 }
             }
             Text {
                 anchors.centerIn: parent
                 visible: panel.rows.length === 0
-                text: "No matching actions"
+                text: panel.emptyMessage()
                 color: theme.foreground
                 opacity: 0.6
+            }
+        }
+        // Pages are created only while on screen and destroyed on leave (Gambito's Loader pattern), so hidden views cost no RAM or bindings.
+        Loader {
+            id: tmuxLoader
+            anchors.top: header.bottom; anchors.bottom: footer.top
+            anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 18
+            active: panel.isOpen && panel.route === "tmux"
+            sourceComponent: Component {
+                TmuxView {
+                    theme: panel.theme; store: panel.org.tmux; rows: panel.rows; selected: panel.selected
+                    showButtons: panel.buttonPreferences.showButtons
+                    opacity: 0
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Component.onCompleted: opacity = 1
+                    onSelect: function(index) { panel.selected = index }
+                    onActivate: function(index) { panel.activate(index) }
+                }
+            }
+        }
+        Loader {
+            id: controlsLoader
+            anchors.top: header.bottom; anchors.bottom: footer.top
+            anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 18
+            active: panel.isOpen && ["controls", "audio", "bluetooth", "network"].indexOf(panel.route) >= 0
+            onLoaded: { if (!search.activeFocus) panel.keyFocus() }
+            sourceComponent: Component {
+                ControlsView {
+                    theme: panel.theme
+                    active: true
+                    column: panel.controlsColumn
+                    opacity: 0
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Component.onCompleted: opacity = 1
+                    onBack: panel.goBack()
+                    onHelpRequested: panel.helpVisible = true
+                    onCloseRequested: panel.closeRequested()
+                }
+            }
+        }
+        Loader {
+            id: calendarLoader
+            anchors.top: header.bottom; anchors.bottom: footer.top
+            anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 18
+            active: panel.isOpen && panel.route === "calendar"
+            onLoaded: { if (!search.activeFocus) panel.keyFocus() }
+            sourceComponent: Component {
+                CalendarView {
+                    theme: panel.theme; org: panel.org
+                    opacity: 0
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Component.onCompleted: opacity = 1
+                    onBack: panel.goBack()
+                    onHelpRequested: panel.helpVisible = true
+                    onCloseRequested: panel.closeRequested()
+                }
+            }
+        }
+        Loader {
+            id: mediaLoader
+            anchors.top: header.bottom; anchors.bottom: footer.top
+            anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 18
+            active: panel.isOpen && panel.route === "media"
+            onLoaded: {
+                if (mediaLoader.item) mediaLoader.item.forceActiveFocus()
+                if (!search.activeFocus) panel.keyFocus()
+            }
+            sourceComponent: Component {
+                MediaView {
+                    theme: panel.theme
+                    media: panel.media
+                    buttonPreferences: panel.buttonPreferences
+                    opacity: 0
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Component.onCompleted: opacity = 1
+                    onBack: panel.goBack()
+                    onCloseRequested: panel.closeRequested()
+                    onHelpRequested: panel.helpVisible = true
+                }
+            }
+        }
+        Loader {
+            id: boardsLoader
+            anchors.top: header.bottom; anchors.bottom: footer.top
+            anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 18
+            active: panel.isOpen && panel.route === "boards"
+            onLoaded: { if (!search.activeFocus) panel.keyFocus() }
+            sourceComponent: Component {
+                BoardsView {
+                    theme: panel.theme
+                    store: panel.feed.azure
+                    buttonPreferences: panel.buttonPreferences
+                    opacity: 0
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Component.onCompleted: opacity = 1
+                    onBack: panel.goBack()
+                    onCloseRequested: panel.closeRequested()
+                    onHelpRequested: panel.helpVisible = true
+                }
+            }
+        }
+        Loader {
+            id: dashboardLoader
+            anchors.top: header.bottom; anchors.topMargin: 8
+            anchors.left: parent.left; anchors.right: parent.right
+            anchors.leftMargin: 18; anchors.rightMargin: 18
+            anchors.bottom: footer.top; anchors.bottomMargin: 8
+            active: panel.isOpen && panel.dashboardVisible
+            onLoaded: { if (!search.activeFocus) panel.keyFocus() }
+            sourceComponent: Component {
+                Dashboard {
+                    feed: panel.feed
+                    buttonPreferences: panel.buttonPreferences
+                    opacity: 0
+                    Behavior on opacity { NumberAnimation { duration: 160 } }
+                    Component.onCompleted: opacity = 1
+                    theme: panel.theme
+                    org: panel.org
+                    onSearchRequested: panel.focusSearch()
+                    onCloseRequested: panel.closeRequested()
+                    onHelpRequested: panel.helpVisible = true
+                    onNavigate: function(destination) { panel.navigate(destination) }
+                    onOpenTmux: function(item) { panel.openTmuxItem(item) }
+                }
+            }
+        }
+        Loader {
+            id: preferencesLoader
+            anchors.top: header.bottom; anchors.bottom: footer.top
+            anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 18
+            active: panel.isOpen && panel.route === "preferences"
+            onLoaded: { if (!search.activeFocus) panel.keyFocus() }
+            sourceComponent: Component {
+                PreferencesView {
+                    theme: panel.theme
+                    preferences: panel.buttonPreferences
+                    opacity: 0
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Component.onCompleted: opacity = 1
+                    onBack: panel.goBack()
+                    onThemesRequested: { panel.route = "themes"; panel.query = ""; panel.selected = 0; Qt.callLater(panel.keyFocus) }
+                    onHelpRequested: panel.helpVisible = true
+                    onCloseRequested: panel.closeRequested()
+                }
+            }
+        }
+        Loader {
+            id: themesLoader
+            anchors.top: header.bottom; anchors.bottom: footer.top
+            anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 18
+            active: panel.isOpen && panel.route === "themes"
+            onLoaded: { if (!search.activeFocus) panel.keyFocus() }
+            sourceComponent: Component {
+                ThemeView {
+                    theme: panel.theme
+                    opacity: 0
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Component.onCompleted: opacity = 1
+                    onBack: panel.goBack()
+                    onCloseRequested: panel.closeRequested()
+                }
+            }
+        }
+        Column {
+            visible: panel.route === "capture"
+            x: 20; y: header.height + 22
+            width: parent.width - 40
+            spacing: 16
+            Text { text: "Capture task"; font.pixelSize: 20; color: theme.foreground }
+            Text { text: "Target: Tasks: #personal · today's note"; font.pixelSize: 12; color: theme.foreground; opacity: 0.65 }
+            Rectangle {
+                width: parent.width; height: 42; radius: 5
+                color: Qt.alpha(theme.foreground, 0.04); border.color: theme.border
+                TextInput {
+                    id: captureInput
+                    anchors.fill: parent; anchors.margins: 12
+                    color: theme.foreground; font.pixelSize: 14; clip: true
+                    maximumLength: 2000
+                    text: panel.captureText
+                    onTextChanged: panel.captureText = text
+                    Text { visible: !captureInput.text; text: "What do you need to do?"; color: theme.foreground; opacity: 0.5 }
+                    Keys.onEscapePressed: panel.goBack()
+                    Keys.onReturnPressed: { if (text.trim()) panel.org.run("capture", [text]) }
+                    Keys.onEnterPressed: { if (text.trim()) panel.org.run("capture", [text]) }
+                }
+            }
+            Text {
+                text: panel.org.busy ? "Saving…" : "Add task  ↵"
+                color: theme.accent; font.pixelSize: 14
+                MouseArea { anchors.fill: parent; enabled: !!panel.captureText.trim() && !panel.org.busy; onClicked: panel.org.run("capture", [panel.captureText]) }
+            }
+            onVisibleChanged: { if (visible) Qt.callLater(function() { captureInput.forceActiveFocus() }) }
+        }
+        Item {
+            id: previewPane
+            visible: panel.route === "clipboard"
+            anchors.top: section.bottom
+            anchors.bottom: footer.top
+            anchors.right: parent.right
+            width: parent.width * 0.43
+            Rectangle { width: 1; height: parent.height; color: theme.border; opacity: 0.45 }
+            Text {
+                x: 16; y: 8
+                text: panel.clipboard.previewLoading ? "Loading preview…" : "Preview"
+                font.pixelSize: 12; color: theme.foreground; opacity: 0.65
+            }
+            Image {
+                anchors.fill: parent
+                anchors.margins: 16
+                anchors.topMargin: 36
+                source: panel.clipboard.previewImage
+                cache: false
+                asynchronous: true
+                fillMode: Image.PreserveAspectFit
+                visible: source.toString().length > 0
+                sourceSize.width: Math.max(1, width * 2)
+                sourceSize.height: Math.max(1, height * 2)
+            }
+            Flickable {
+                id: textPreview
+                anchors.fill: parent
+                anchors.margins: 16
+                anchors.topMargin: 36
+                clip: true
+                visible: !panel.clipboard.previewImage
+                contentWidth: width
+                contentHeight: previewBody.height
+                boundsBehavior: Flickable.StopAtBounds
+                Text {
+                    id: previewBody
+                    width: textPreview.width
+                    text: panel.clipboard.previewText
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WrapAnywhere
+                    font.family: "monospace"
+                    font.pixelSize: 12
+                    color: theme.foreground
+                    onTextChanged: textPreview.contentY = 0
+                }
+            }
+        }
+        // Key mode for list pages (actions, power, notes results, tmux…): j/k, Enter, Backspace back.
+        Item {
+            id: listKeys
+            Keys.onPressed: function(event) {
+                var k = event.text, last = Math.max(0, panel.rows.length - 1)
+                if (k === "/" || k === "i") panel.focusSearch()
+                else if (k === "?") panel.helpVisible = true
+                else if (panel.route === "tmux" && k === "e") panel.activate(panel.selected)
+                else if (k === "q") panel.closeRequested()
+                else if (k === "j" || event.key === Qt.Key_Down) panel.selected = Math.min(last, panel.selected + 1)
+                else if (k === "k" || event.key === Qt.Key_Up) panel.selected = Math.max(0, panel.selected - 1)
+                else if (k === "g") panel.selected = 0
+                else if (k === "G") panel.selected = last
+                else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) panel.activate(panel.selected)
+                else if (event.key === Qt.Key_K && (event.modifiers & Qt.ControlModifier)) {
+                    var item = panel.rows[panel.selected]
+                    if (item && (item.orgPath || item.tmuxWindow)) {
+                        panel.contextItem = item
+                        panel.selected = 0
+                    }
+                }
+                else if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Escape) panel.goBack()
+                else return
+                event.accepted = true
+            }
+        }
+        FocusScope {
+            id: help
+            anchors.fill: parent
+            visible: panel.helpVisible
+            z: 10
+            onVisibleChanged: { if (visible) forceActiveFocus(); else Qt.callLater(panel.keyFocus) }
+            Keys.onPressed: function(event) { panel.helpVisible = false; event.accepted = true }
+            MouseArea { anchors.fill: parent; onClicked: panel.helpVisible = false }
+            Rectangle { anchors.fill: parent; color: theme.background; opacity: 0.94; radius: 7 }
+            Column {
+                anchors.centerIn: parent
+                spacing: 14
+                Text { text: "Keys"; color: theme.foreground; font.pixelSize: 18 }
+                Grid {
+                    columns: 2; columnSpacing: 48; rowSpacing: 7
+                    flow: Grid.TopToBottom
+                    rows: Math.ceil(panel.helpRows().length / 2)
+                    Repeater {
+                        model: panel.helpVisible ? panel.helpRows() : []
+                        delegate: Row {
+                            required property var modelData
+                            spacing: 14
+                            Text { width: 110; text: modelData[0]; color: theme.accent; font.family: "monospace"; font.pixelSize: 12; horizontalAlignment: Text.AlignRight }
+                            Text { text: modelData[1]; color: theme.foreground; font.pixelSize: 12 }
+                        }
+                    }
+                }
+                Text { text: "Any key closes"; color: theme.foreground; opacity: 0.5; font.pixelSize: 11 }
             }
         }
         Item {
@@ -248,8 +974,11 @@ PanelWindow {
             Rectangle { width: parent.width; height: 1; color: theme.border; opacity: 0.5 }
             Text {
                 x: 16
+                width: parent.width - 100
+                elide: Text.ElideRight
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
-                text: "↑ ↓ / Tab navigate    Enter open    Esc close"
+                    text: panel.footerHint()
                 font.pixelSize: 11
                 color: theme.foreground
                 opacity: 0.7
@@ -258,7 +987,7 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Desktop"
+                text: panel.route === "clipboard" ? (panel.clipboard.copying ? "Copying…" : panel.clipboard.error ? "Copy failed — retry" : "Clipboard") : "Desktop"
                 font.pixelSize: 11
                 color: theme.foreground
                 opacity: 0.6

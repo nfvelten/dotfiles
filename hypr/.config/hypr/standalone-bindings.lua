@@ -6,6 +6,10 @@
 
 -- Applications
 
+-- Compact reference shown only while Super is held.
+hl.bind("SUPER_L", hl.dsp.exec_cmd("quickshell ipc call yerba showKeys"))
+hl.bind("SUPER + SUPER_L", hl.dsp.exec_cmd("quickshell ipc call yerba hideKeys"), { release = true })
+
 hl.unbind("SUPER + SPACE")
 hl.unbind("SUPER + SPACE")
 hl.bind("SUPER + SPACE", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-menu"))
@@ -44,12 +48,15 @@ hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("ghostty -e btop"))
 
 hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/scratchematic"))
 
-hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd("spotify"))
+hl.unbind("SUPER + SHIFT + M")
+hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd("quickshell ipc call yerba mediaMenu"))
 
 hl.bind("SUPER + C", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/scratchtmux"))
 
 -- Windows
 
+-- Feche a janela ativa com o dispatcher nativo; o evento closewindow esconde
+-- o Which Key sem trocar o alvo do foco para a própria camada do Quickshell.
 hl.bind("SUPER + W", hl.dsp.window.close())
 
 hl.bind("SUPER + F", hl.dsp.window.fullscreen())
@@ -121,7 +128,7 @@ hl.bind("SUPER + CTRL + A", hl.dsp.exec_cmd("ghostty -e wiremix"))
 
 hl.bind("SUPER + CTRL + X", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-power"))
 
-hl.bind("SUPER + ESCAPE", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-power"))
+hl.bind("SUPER + ESCAPE", hl.dsp.exec_cmd("quickshell ipc call yerba hideKeys; " .. os.getenv("HOME") .. "/.local/bin/desktop-power"))
 
 hl.bind("SUPER + CTRL + P", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-power"))
 
@@ -168,3 +175,10 @@ hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"))
 hl.bind("PRINT", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-screenshot"))
 
 hl.bind("SHIFT + PRINT", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-screenshot full"))
+
+hl.bind("CTRL + PRINT", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-screenshot edit"))
+
+hl.bind("CTRL + SHIFT + PRINT", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-screenshot full-edit"))
+
+-- Teclado do homelab: janela dedicada, somente teclado via SSH.
+hl.bind("CTRL + ALT + K", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/homelab-keyboard"))

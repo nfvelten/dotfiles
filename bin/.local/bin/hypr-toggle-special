@@ -1,11 +1,56 @@
 #!/usr/bin/env bash
+# Toggle a special workspace (scratchpad).
+#
+#   hypr-toggle-special [--no-anim] NAME
+#
+# --no-anim (or YERBA_SPECIAL_NOANIM=1) skips Hyprland's specialWorkspace animation for this
+# toggle: the current setting is read back from Hyprland and restored, never hardcoded. The Yerba
+# dock uses it when it has already morphed into (or out of) the scratchpad's rect.
+#
+# With the Yerba dock open, showing a scratchpad is handed to the dock so it morphs into the
+# window instead of the scratchpad stacking on top of it.
 set -u
 
+no_anim=false
+if [[ ${1:-} == --no-anim ]]; then
+    no_anim=true
+    shift
+fi
+[[ ${YERBA_SPECIAL_NOANIM:-} == 1 ]] && no_anim=true
 workspace="$1"
 
+# Ao trocar diretamente entre dois scratchpads, faça a passagem pelo morph da
+# dock em vez de deixar o Hyprland animar o novo scratch pela lateral.
+current_special=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .specialWorkspace.name')
+if [[ ${YERBA_DIRECT_SWITCH:-0} != 1 && -n "$current_special" && "$current_special" != "special:$workspace" ]] &&
+    quickshell ipc call yerba status 2>/dev/null | jq -e '.open' >/dev/null 2>&1; then
+    quickshell ipc call yerba switchSpecial "$workspace" >/dev/null
+    exit 0
+fi
+if [[ ${YERBA_DIRECT_SWITCH:-0} != 1 && -n "$current_special" && "$current_special" != "special:$workspace" ]]; then
+    quickshell ipc call yerba switchSpecial "$workspace" >/dev/null 2>&1 && exit 0
+fi
+
+if ! $no_anim &&
+    ! hyprctl monitors -j | jq -e --arg ws "special:$workspace" '.[] | select(.specialWorkspace.name == $ws)' >/dev/null &&
+    quickshell ipc call yerba status 2>/dev/null | jq -e '.open' >/dev/null; then
+    quickshell ipc call yerba morphTo "$workspace" && exit 0
+fi
+
+restore=""
+$no_anim && restore=$("$HOME/.local/bin/hypr-animation-off" specialWorkspace)
+
+status=1
 for _ in 1 2 3 4 5; do
-    hyprctl eval "hl.dispatch(hl.dsp.workspace.toggle_special(\"$workspace\"))" >/dev/null 2>&1 && exit 0
+    if hyprctl eval "hl.dispatch(hl.dsp.workspace.toggle_special(\"$workspace\"))" >/dev/null 2>&1; then
+        status=0
+        break
+    fi
     sleep 0.1
 done
 
-exit 1
+if [[ -n $restore ]]; then
+    sleep 0.05
+    hyprctl eval "$restore" >/dev/null
+fi
+exit "$status"

@@ -56,3 +56,4 @@
 (package! elfeed-org)
 (package! elfeed-tube)
 (package! elfeed-tube-mpv)
+(package! org-roam)

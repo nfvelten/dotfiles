@@ -6,6 +6,7 @@ fcitx5-qt
 fontconfig
 ghostty
 grim
+satty
 hypridle
 hyprland
 hyprland-guiutils

@@ -3,10 +3,19 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Widgets
 import Quickshell.Services.UPower
+import Quickshell.Services.Pipewire
+import Quickshell.Bluetooth
+import Quickshell.Networking
 
 Rectangle {
     required property QtObject theme
     required property string time
+    signal controlsRequested(int column)
+    PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
+    readonly property var sinkAudio: Pipewire.defaultAudioSink ? Pipewire.defaultAudioSink.audio : null
+    readonly property var adapter: Bluetooth.defaultAdapter
+    readonly property bool wiredUp: Networking.devices.values.some(function(d) { return d.type === DeviceType.Wired && d.connected })
+    readonly property bool wifiUp: Networking.devices.values.some(function(d) { return d.type === DeviceType.Wifi && d.connected })
     radius: theme.radius
     color: theme.background
     border.color: theme.border
@@ -34,9 +43,9 @@ Rectangle {
         spacing: 10
         Repeater {
             model: [
-                {icon: "󰤨", app: "nmtui"},
-                {icon: "󰕾", app: "wiremix"},
-                {icon: "", app: "bluetui"}
+                {icon: wiredUp ? "󰈀" : !Networking.wifiEnabled ? "󰤮" : wifiUp ? "󰤨" : "󰤯", column: 2},
+                {icon: sinkAudio && sinkAudio.muted ? "󰖁" : "󰕾", column: 0},
+                {icon: !adapter || !adapter.enabled ? "󰂲" : Bluetooth.devices.values.some(function(d) { return d.connected }) ? "󰂱" : "", column: 1}
             ]
             delegate: Text {
                 text: modelData.icon
@@ -44,7 +53,7 @@ Rectangle {
                 font.pixelSize: 13
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: Quickshell.execDetached(["ghostty", "-e", modelData.app])
+                    onClicked: controlsRequested(modelData.column)
                 }
             }
         }

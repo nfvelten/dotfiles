@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+# Args: start end, both ISO (yyyy-mm-dd). Emits a JSON array of
+# {date, time, end, title, calendar, uid, location, description} for that range.
+#
+# Title filters live in $HOME/.config/omarchy/khal-filters.json as
+# {"<calendar>": "<regex>"} — an entry keeps only the events whose title
+# matches. The MLB feed is ~15 games a day, so without one the agenda is
+# nothing but baseball.
+
+set -euo pipefail
+
+require() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "$1 is not installed or not on PATH" >&2
+    exit 127
+  }
+}
+
+# A missing khal used to leave an empty JSON array on stdout, which the panel
+# could not tell apart from a day with nothing on it.
+require khal
+require jq
+require timeout
+require python3
+
+filters="${KHAL_FILTERS:-$HOME/.config/omarchy/khal-filters.json}"
+
+# The filter map is read by bin/read-config, which walks every component of
+# the path with O_NOFOLLOW, holds the directory it lands in, and reads the
+# bytes from the descriptor it verified rather than from the name. Asking
+# about the path and then opening it are two resolutions of the same name and
+# need not agree. Absent is the ordinary case and means no filters at all.
+max_filters_bytes=$((64 * 1024))
+# Expanded rather than shelled out to dirname, so the helper keeps working
+# under a PATH that has been pared down to what it actually needs.
+here=$(cd "${BASH_SOURCE[0]%/*}" && pwd)
+
+filters_file=$(mktemp)
+main_pid=$BASHPID
+trap '[ "$BASHPID" = "$main_pid" ] && rm -f "$filters_file" "${status_file:-}"' EXIT
+echo '{}' >"$filters_file"
+
+# An unreadable filter map is the same as none: the agenda is worth more than
+# the filtering, and the panel has no way to show the difference either way.
+if "$here/read-config" "$filters" "$max_filters_bytes" --optional \
+  >"$filters_file" 2>/dev/null; then
+  jq -e . "$filters_file" >/dev/null 2>&1 || echo '{}' >"$filters_file"
+else
+  echo '{}' >"$filters_file"
+fi
+
+to_khal() {
+  IFS='-' read -r y m d <<<"$1"
+  printf '%02d/%02d/%04d' "$((10#$d))" "$((10#$m))" "$((10#$y))"
+}
+
+start_khal=$(to_khal "$1")
+end_khal=$(to_khal "$2")
+
+fields=(--json start-date --json start-time --json end-date --json end-time
+  --json title --json calendar --json uid --json location --json description
+  --json repeat-symbol)
+
+# Ceilings on what this can hand back. The panel reads whatever lands here
+# into the shell's memory, and the events come out of .ics files someone else
+# publishes, so neither the number of events nor the length of any one field
+# is left to the publisher. Fields are cut to the same 400 characters the UI
+# would cut them to anyway; the event cap is far above a real month and only
+# bites on a feed that has stopped making sense.
+max_events=2000
+max_field=400
+# The raw stream is bounded too, because the caps above can only be applied to
+# what has already been read. khal's own output is several times the size of
+# the JSON emitted here, so this sits well above a real month of a real
+# calendar and only bites on a store that has stopped making sense.
+max_bytes=$((8 * 1024 * 1024))
+# A store on a stalled network mount can leave khal running forever while
+# saying nothing, which no byte ceiling can catch. Overridable so the tests
+# can watch the deadline bite without waiting on it.
+max_seconds="${KHAL_TIMEOUT:-30}"
+
+# Guarded on the pid, in the trap set above: the pipeline below runs its first
+# stage in a subshell, which inherits that trap and would delete these files on
+# its way out, before the status just written there could be read.
+status_file=$(mktemp)
+
+# khal prints one JSON array per day in the range, so the output is a stream
+# of arrays rather than one document. Each day is filtered and cut down as it
+# arrives, and the event ceiling is applied to that stream, so nothing is
+# aggregated until both the bytes and the number of events are already bounded.
+# Only then is the bounded set slurped to be deduplicated and sorted, which
+# cannot be done a day at a time.
+# pipefail is off for this one pipeline: reaching a ceiling closes the pipe
+# under whatever is upstream of it, and that SIGPIPE is the bound working, not
+# a failure. The statuses that do matter are read back individually below.
+set +o pipefail
+{
+  timeout --kill-after=5s "$max_seconds" khal list "$start_khal" "$end_khal" "${fields[@]}" 2>/dev/null ||
+    echo $? >"$status_file"
+} |
+  head -c "$max_bytes" |
+  jq -c --slurpfile f "$filters_file" \
+    --argjson maxField "$max_field" '
+    ($f[0] // {}) as $filters
+    | .[]
+    | select(
+        ($filters[.calendar] // "") as $re
+        | $re == "" or (.title | test($re))
+      )
+    | {
+        date: (.["start-date"] | split("/") | .[2] + "-" + .[1] + "-" + .[0]),
+        time: .["start-time"],
+        endDate: (.["end-date"] | split("/") | .[2] + "-" + .[1] + "-" + .[0]),
+        endTime: .["end-time"],
+        title: (.title[0:$maxField]),
+        calendar: (.calendar[0:$maxField]),
+        uid: (.uid[0:$maxField]),
+        location: (.location[0:$maxField]),
+        # fixtur.es staples a promo trailer onto the DESCRIPTION of every
+        # event it publishes ("Calendar not up to date? …" plus a Buy Me a
+        # Coffee link), which for a fixture is the entire description. It is
+        # advertising in a calendar, and it filled the detail card on every
+        # match, so it is cut here rather than in the UI — the raw .ics stays
+        # untouched and comes back whole on the next sync.
+        description: (
+          .description
+          | sub("Calendar not up to date\\?[\\s\\S]*$"; "")
+          | sub("Support [^\\n]*Buy Me a Coffee[\\s\\S]*$"; "")
+          | sub("^\\s+|\\s+$"; "")
+          | .[0:$maxField]
+        ),
+        repeats: (.["repeat-symbol"] != "")
+      }
+  ' |
+  head -n "$max_events" |
+  jq -c -s 'unique | sort_by(.date, .time)'
+pipeline_status=("${PIPESTATUS[@]}")
+set -o pipefail
+
+# Whether the events came out in one piece. Upstream stages are allowed to be
+# cut short by a ceiling, but the stage that prints the document is not.
+if [ "${pipeline_status[4]}" -ne 0 ]; then
+  echo "could not assemble the event list (jq exited ${pipeline_status[4]})" >&2
+  exit "${pipeline_status[4]}"
+fi
+
+# Reported after the fact: the events are streamed out as they are read, so
+# there is nothing to hold back. A ceiling cutting the stream short closes the
+# pipe under khal, and that SIGPIPE is the expected end of a bounded read
+# rather than a failure of the calendar.
+# Only written when khal ends badly, so empty is the ordinary case: it either
+# finished cleanly or was cut short by a ceiling downstream, which closes the
+# pipe under it and is the bound working rather than a failure.
+khal_status=$(cat "$status_file")
+case "${khal_status:-0}" in
+0 | 141) ;;
+124)
+  echo "khal did not finish within ${max_seconds}s" >&2
+  exit 124
+  ;;
+*)
+  echo "khal exited $khal_status" >&2
+  exit "$khal_status"
+  ;;
+esac

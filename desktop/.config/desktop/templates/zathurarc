@@ -1,0 +1,26 @@
+# Gerado pela paleta compartilhada do desktop.
+set font "$font 11"
+set default-bg "#$background"
+set default-fg "#$foreground"
+set recolor true
+set recolor-lightcolor "#$background"
+set recolor-darkcolor "#$foreground"
+set recolor-keephue true
+set statusbar-bg "#$background"
+set statusbar-fg "#$foreground"
+set inputbar-bg "#$background"
+set inputbar-fg "#$foreground"
+set completion-bg "#$background"
+set completion-fg "#$foreground"
+set completion-group-bg "#$background"
+set completion-group-fg "#$accent"
+set completion-highlight-bg "#$accent"
+set completion-highlight-fg "#$background"
+set notification-bg "#$background"
+set notification-fg "#$foreground"
+set notification-error-bg "#$background"
+set notification-error-fg "#$error"
+set notification-warning-bg "#$background"
+set notification-warning-fg "#$accent"
+set adjust-open width
+set page-padding 8
