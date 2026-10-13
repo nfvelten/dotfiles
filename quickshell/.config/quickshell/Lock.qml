@@ -7,6 +7,7 @@ import Quickshell.Services.Pam
 Scope {
     id: root
 
+    required property QtObject theme
     property alias locked: sessionLock.locked
     property string password: ""
     property bool authenticating: false

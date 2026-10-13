@@ -1,0 +1,14 @@
+[Unit]
+Description=Lightweight Spotify playback daemon
+After=graphical-session.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/spotify_player --daemon
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

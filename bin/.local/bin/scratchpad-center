@@ -1,15 +1,7 @@
 #!/bin/bash
 # Resize and re-center a scratchpad after it is toggled into view.
-#
-# Window rules run `size` and `center` only at map time, so a scratchpad opened
-# on one monitor keeps that size and those coordinates when its special
-# workspace is later shown on a monitor with a different logical size.
-#
-# Guarded on the active window title: toggle_special also *hides*, and in that
-# case the active window is a normal one that must not be moved.
 
 title="$1"
-
 window=$(hyprctl activewindow -j)
 [[ "$(jq -r '.title // empty' <<<"$window")" == "$title" ]] || exit 0
 

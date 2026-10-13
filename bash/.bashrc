@@ -23,9 +23,8 @@ miniflux() {
 [ -f ~/.config/shell/work.sh ] && source ~/.config/shell/work.sh
 
 # ── Shell tooling ─────────────────────────────────────────────────
-[[ -f /usr/share/bash-preexec/bash-preexec.sh ]] && source /usr/share/bash-preexec/bash-preexec.sh
-eval "$(starship init bash)"
 eval "$(atuin init bash)"
+eval "$(starship init bash)"
 eval "$(direnv hook bash)"   # env por diretório via .envrc
 
 if [[ -n ${TMUX:-} ]]; then

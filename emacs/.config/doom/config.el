@@ -74,6 +74,23 @@
 ;; org-agenda-files is rebuilt on every agenda call — see `nf/agenda-files'.
 (setq org-directory "~/org/")
 
+;; Org-roam adds links and backlinks on top of the existing vault structure.
+;; The directory layout remains the source of truth; roam only indexes it.
+(use-package! org-roam
+  :commands (org-roam-node-find org-roam-node-insert org-roam-buffer-toggle org-roam-capture)
+  :init
+  (setq org-roam-directory (file-truename org-directory)
+        org-roam-completion-everywhere t
+        org-roam-database-connector 'sqlite-builtin)
+  :config
+  (org-roam-db-autosync-mode)
+  (map! :leader
+        :prefix ("n r" . "roam")
+        :desc "Find or create note" "f" #'org-roam-node-find
+        :desc "Insert link" "i" #'org-roam-node-insert
+        :desc "Show backlinks" "b" #'org-roam-buffer-toggle
+        :desc "Capture note" "c" #'org-roam-capture))
+
 (setq doom-font (font-spec :family "JetBrainsMono Nerd Font" :size 18)
       doom-variable-pitch-font (font-spec :family "iA Writer Quattro S" :size 19)
       doom-serif-font (font-spec :family "iA Writer Quattro S" :size 19))

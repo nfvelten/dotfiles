@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wayland screenshot flow shared by PrintScreen, F10 and Super+Ctrl+C.
+# This stays independent from the Yerba dock so it also works with the dock closed.
+pkill -x slurp && exit 0
+
+mode=${1:-smart}
+edit=false
+case "$mode" in
+    edit) edit=true; mode=smart ;;
+    full-edit) edit=true; mode=full ;;
+esac
+
+output_dir=${SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}
+mkdir -p "$output_dir"
+file="$output_dir/screenshot-$(date +%Y-%m-%d_%H-%M-%S).png"
+
+if [[ $mode == full ]]; then
+    grim "$file"
+else
+    notify-send 'Screenshot picker' 'Select a window or drag a region'
+    active_workspace=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | .activeWorkspace.id')
+    rects=$(
+        {
+            hyprctl monitors -j | jq -r '.[] | select(.focused == true) | "\(.x),\(.y) \(.width)x\(.height)"'
+            hyprctl clients -j | jq -r --arg ws "$active_workspace" '[.[] | select(.workspace.id == ($ws | tonumber) and .hidden != true) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"] | unique[]'
+        }
+    )
+    hyprpicker -r -z >/dev/null 2>&1 &
+    freeze_pid=$!
+    trap 'kill "$freeze_pid" 2>/dev/null || true' EXIT
+    selection=$(printf '%s\n' "$rects" | slurp) || exit 0
+    if [[ $selection =~ ^(-?[0-9]+),(-?[0-9]+)[[:space:]]([0-9]+)x([0-9]+)$ ]] && ((BASH_REMATCH[3] * BASH_REMATCH[4] < 20)); then
+        click_x=${BASH_REMATCH[1]}; click_y=${BASH_REMATCH[2]}
+        while read -r rect; do
+            [[ $rect =~ ^(-?[0-9]+),(-?[0-9]+)[[:space:]]([0-9]+)x([0-9]+)$ ]] || continue
+            if ((click_x >= BASH_REMATCH[1] && click_x < BASH_REMATCH[1] + BASH_REMATCH[3] && click_y >= BASH_REMATCH[2] && click_y < BASH_REMATCH[2] + BASH_REMATCH[4])); then
+                selection=$rect; break
+            fi
+        done <<< "$rects"
+    fi
+    grim -g "$selection" "$file"
+    kill "$freeze_pid" 2>/dev/null || true
+    trap - EXIT
+fi
+
+# Satty is optional so capture remains usable on a minimal install.
+if $edit && command -v satty >/dev/null 2>&1; then
+    edited="${file%.png}-edited.png"
+    rm -f "$edited"
+    satty --filename "$file" --output-filename "$edited" --copy-command 'wl-copy' \
+        --early-exit save --initial-tool arrow --title 'Screenshot'
+    if [[ -s $edited ]]; then
+        mv -f "$edited" "$file"
+        wl-copy --type image/png < "$file"
+    fi
+else
+    wl-copy --type image/png < "$file"
+fi
+
+notify-send 'Screenshot ready' "$(basename "$file")" >/dev/null 2>&1 || true

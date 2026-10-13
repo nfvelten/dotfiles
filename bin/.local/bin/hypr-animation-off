@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Disable a Hyprland animation leaf and print the Lua that restores it, read back from Hyprland
+# (never hardcoded). Prints nothing when the leaf isn't explicitly configured or is already off.
+#
+#   restore=$(hypr-animation-off specialWorkspace); ...; [[ -n $restore ]] && hyprctl eval "$restore"
+set -u
+
+leaf="$1"
+current=$(hyprctl animations -j | jq -c --arg leaf "$leaf" '.[0][] | select(.name == $leaf and .overridden and .enabled)')
+[[ -n $current ]] || exit 0
+jq -r --arg leaf "$leaf" '"hl.animation({ leaf = \($leaf | tojson), enabled = true, speed = \(.speed), bezier = \(.bezier | tojson), style = \(.style | tojson) })"' <<<"$current"
+hyprctl eval "hl.animation({ leaf = \"$leaf\", enabled = false })" >/dev/null

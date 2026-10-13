@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# cv-build: refresh open source numbers from GitHub, then export an Org CV to Markdown.
+#
+# Usage: cv-build [--no-facts] [cv.org] [out.md]
+#   cv.org  default: ~/org/Pessoal/CV.org
+#   out.md  default: ~/code/personal/career-ops/cv.md (previous copy kept as cv.md.bak.<timestamp>)
+set -euo pipefail
+
+vault="${ORG_DIR:-$HOME/org}/Pessoal"
+facts="$vault/CV - Fatos.org"
+gh_user="nfvelten"
+
+update_facts=true
+if [[ ${1:-} == --no-facts ]]; then
+	update_facts=false
+	shift
+fi
+src="$(realpath "${1:-$vault/CV.org}")"
+out="${2:-$HOME/code/personal/career-ops/cv.md}"
+
+if $update_facts; then
+	# Upstream PRs only: skip own repos and awesome-list submissions (promotion, not code).
+	prs_json="$(gh search prs --author "$gh_user" --limit 1000 --json repository,state \
+		--jq '[.[] | select(.repository.nameWithOwner | test("^(nfvelten|harbefas)/|/awesome-") | not)]')"
+	prs="$(jq length <<<"$prs_json")"
+	projects="$(jq '[.[].repository.nameWithOwner] | unique | length' <<<"$prs_json")"
+	merged="$(jq '[.[] | select(.state == "merged")] | length' <<<"$prs_json")"
+	sed -i -E \
+		-e "s/^(#\+MACRO: oss_prs ).*/\1$prs/" \
+		-e "s/^(#\+MACRO: oss_projects ).*/\1$projects/" \
+		-e "s/^(#\+MACRO: oss_merged ).*/\1$merged/" \
+		"$facts"
+	echo "facts: $prs PRs, $projects projects, $merged merged"
+fi
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+if ! emacs --batch "$src" --eval "(progn
+  (require 'ox-md)
+  (setq org-export-with-toc nil
+        org-export-with-section-numbers nil
+        org-export-with-broken-links 'mark)
+  (org-export-to-file 'md \"$tmp/cv.md\"))" 2>"$tmp/emacs.log"; then
+	cat "$tmp/emacs.log" >&2
+	exit 1
+fi
+
+# ox-md writes Org's --- and -- as HTML entities; keep plain dashes for career-ops.
+sed -i 's/&mdash;/—/g; s/&ndash;/–/g' "$tmp/cv.md"
+
+if grep -n 'BROKEN LINK' "$tmp/cv.md" >&2; then
+	echo "cv-build: unresolved links in exported sections; fix them or tag the section :noexport:" >&2
+	exit 1
+fi
+
+if [[ -f $out ]]; then
+	cp "$out" "$out.bak.$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$(dirname "$out")"
+cp "$tmp/cv.md" "$out"
+echo "exported: $src -> $out"

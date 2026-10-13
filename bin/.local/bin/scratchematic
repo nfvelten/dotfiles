@@ -8,6 +8,17 @@ if ! hyprctl clients -j | jq -e '.[] | select(.title == "__emacsnote")' >/dev/nu
         sleep 0.1
     done
 fi
+# Quando a dock já está aberta, deixe o Quickshell conduzir o morph, como no
+# scratch do tmux. O toggle direto do Hyprland faria a janela entrar pela
+# animação lateral e quebraria o caminho inverso.
+if quickshell ipc call yerba status 2>/dev/null | jq -e '.open' >/dev/null 2>&1; then
+    quickshell ipc call yerba morphTo emacsnote >/dev/null
+    exit 0
+fi
+current_special=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .specialWorkspace.name')
+if [[ -n "$current_special" && "$current_special" != "special:emacsnote" ]]; then
+    quickshell ipc call yerba switchSpecial emacsnote >/dev/null 2>&1 && exit 0
+fi
 # Hyprland 0.56 ignores workspace animation overrides for special workspaces.
 # The offset is chosen synchronously at dispatch; restore the default afterward.
 hyprctl eval '
@@ -15,13 +26,23 @@ hyprctl eval '
     hl.dispatch(hl.dsp.workspace.toggle_special("emacsnote"))
     hl.animation({leaf="specialWorkspace", enabled=true, speed=6, bezier="smooth", style="slidefadevert 25"})
 ' >/dev/null
-window=$(hyprctl activewindow -j)
-[[ $(jq -r '.title // empty' <<<"$window") == __emacsnote ]] || exit 0
+visible=$(hyprctl monitors -j | jq -r 'any(.[]; .specialWorkspace.name == "special:emacsnote")')
+[[ "$visible" == true ]] || exit 0
+window=$(hyprctl clients -j | jq -c '.[] | select(.title == "__emacsnote")' | head -n1)
+[[ -n "$window" ]] || exit 0
 # Recalculate geometry when toggled on another monitor.
-read -r width height x y < <(hyprctl monitors -j | jq -r --argjson win "$window" '
+top_reserved=0
+if quickshell ipc call yerba status 2>/dev/null | jq -e '.topBar == true' >/dev/null 2>&1; then
+    top_reserved=40
+fi
+read -r width height x y < <(hyprctl monitors -j | jq -r --argjson win "$window" --argjson top_reserved "$top_reserved" '
     .[] | select(.id == $win.monitor) |
     (.width / .scale) as $w | (.height / .scale) as $h |
     ($w * 0.44 | floor) as $pw | ($h * 0.90 | floor) as $ph |
-    "\($pw) \($ph) \(.x + $w - $pw - 28 | floor) \(.y + ($h - $ph) / 2 | floor)"')
+    "\($pw) \($ph) \(.x + $w - $pw - 28 | floor) \(.y + $top_reserved + ($h - $top_reserved - $ph) / 2 | floor)"')
 hyprctl eval "hl.dispatch(hl.dsp.window.resize({x=$width,y=$height,window=\"title:^__emacsnote$\"}))" >/dev/null
 hyprctl eval "hl.dispatch(hl.dsp.window.move({x=$x,y=$y,relative=false,window=\"title:^__emacsnote$\"}))" >/dev/null
+# O toggle da special workspace pode preservar o foco anterior; force o foco
+# no scratch depois de aplicar a geometria inicial.
+address=$(jq -r '.address' <<<"$window")
+hyprctl eval "hl.dispatch(hl.dsp.focus({window=\"address:$address\"}))" >/dev/null

@@ -20,6 +20,8 @@ Rectangle {
     radius: 7
     border.width: 1
     border.color: theme.border
+    Behavior on color { ColorAnimation { duration: 140 } }
+    Behavior on border.color { ColorAnimation { duration: 140 } }
     HoverHandler { id: hover }
     TapHandler { onTapped: card.defaultRequested() }
     Rectangle { x: 7; width: parent.width - 14; height: 2; color: card.critical ? "#c25d44" : theme.accent }
@@ -32,7 +34,7 @@ Rectangle {
             spacing: 10
             Image {
                 visible: card.icon !== "" && status !== Image.Error
-                source: card.icon.startsWith("/") ? "file://" + card.icon : card.icon.indexOf(":") >= 0 ? card.icon : Quickshell.iconPath(card.icon)
+                source: !card.icon ? "" : card.icon.startsWith("/") ? "file://" + card.icon : card.icon.indexOf(":") >= 0 ? card.icon : Quickshell.iconPath(card.icon)
                 sourceSize.width: 28; sourceSize.height: 28
                 Layout.preferredWidth: 28; Layout.preferredHeight: 28
                 fillMode: Image.PreserveAspectFit

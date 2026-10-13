@@ -323,6 +323,14 @@ hl.window_rule({
     workspace = "special:emacsnote silent",
     float = true,
     size = { "monitor_w*0.44", "monitor_h*0.90" },
+    -- O script ajusta o deslocamento quando a top bar global estiver ativa.
     move = { "monitor_w*0.56-28", "monitor_h*0.05" },
     animation = "slide right",
+})
+
+-- Zathura: manter o PDF totalmente opaco, inclusive sem foco.
+hl.window_rule({
+    name = "zathura_opaque",
+    match = { class = "^(org\\.pwmt\\.zathura|Zathura|zathura)$" },
+    opacity = "1.0 override 1.0 override 1.0 override",
 })
