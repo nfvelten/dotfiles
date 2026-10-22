@@ -2,7 +2,7 @@
 Description=Nightly push of committed Org vault and unsaved-config report
 
 [Timer]
-OnCalendar=*-*-* 03:30:00
+OnCalendar=*-*-* 23:30:00
 Persistent=true
 
 [Install]
