@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Media keys: act on whatever is playing; otherwise on the most recently active player
+# (playerctld). Keeps play/pause from starting Spotify while a browser video plays.
+action=${1:?usage: media-key play-pause|next|previous}
+
+playing=$(playerctl -a -f '{{playerName}} {{status}}' status 2>/dev/null | awk '$2 == "Playing" { print $1; exit }')
+if [[ -n $playing ]]; then
+    exec playerctl -p "$playing" "$action"
+fi
+exec playerctl "$action"

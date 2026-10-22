@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# QR codes on the desktop.
+#   desktop-qr read   drag a region, decode QR/barcodes, copy the result
+#   desktop-qr show   show the clipboard as a QR code (scan it with the phone)
+#   desktop-qr wifi   show the current Wi-Fi network as a QR code
+# Secrets (Wi-Fi passwords, 2FA) are copied as sensitive, so cliphist skips them,
+# and never appear in notifications.
+mode=${1:-read}
+app='QR code'
+image="${XDG_RUNTIME_DIR:-/tmp}/yerba-qr.png"
+
+display_qr() {
+    qrencode -o "$image" -s 12 -m 3 -- "$1"
+    # imv execs imv-wayland; close the previous QR window, not other images.
+    pkill -f "imv(-wayland)? $image" 2>/dev/null || true
+    imv "$image" &
+    disown
+}
+
+# Escape \ ; , : " as the Wi-Fi QR format requires.
+wifi_escape() {
+    local s=${1//\\/\\\\}
+    printf '%s' "${s//[;,:\"]/\\&}"
+}
+
+case $mode in
+read)
+    pkill -x slurp && exit 0
+    hyprpicker -r -z >/dev/null 2>&1 &
+    freeze_pid=$!
+    trap 'kill "$freeze_pid" 2>/dev/null || true' EXIT
+    selection=$(slurp) || exit 0
+    codes=$(grim -g "$selection" -s 2 - | zbarimg --raw -q - 2>/dev/null || true)
+    kill "$freeze_pid" 2>/dev/null || true
+    trap - EXIT
+    if [[ -z $codes ]]; then
+        notify-send -a "$app" 'No QR code found' 'Try selecting the code more tightly'
+        exit 1
+    fi
+    first=$(head -n1 <<<"$codes")
+    case $first in
+    WIFI:*)
+        ssid=$(sed -nE 's/.*[:;]S:(([^;\\]|\\.)*);.*/\1/p' <<<"$first" | sed -E 's/\\(.)/\1/g')
+        password=$(sed -nE 's/.*[:;]P:(([^;\\]|\\.)*);.*/\1/p' <<<"$first" | sed -E 's/\\(.)/\1/g')
+        printf '%s' "$password" | wl-copy --sensitive
+        notify-send -a "$app" "Wi-Fi password copied" "Network: ${ssid:-unknown} · not saved in clipboard history"
+        ;;
+    otpauth://*)
+        printf '%s' "$first" | wl-copy --sensitive
+        notify-send -a "$app" '2FA setup link copied' 'Paste it into your authenticator · not saved in clipboard history'
+        ;;
+    000201*br.gov.bcb.pix*)
+        printf '%s' "$first" | wl-copy
+        notify-send -a "$app" 'PIX copia e cola copied' 'Paste it in the bank app'
+        ;;
+    *)
+        printf '%s' "$codes" | wl-copy
+        notify-send -a "$app" 'QR code copied' "${first:0:200}"
+        ;;
+    esac
+    ;;
+show)
+    text=$(wl-paste -n 2>/dev/null || true)
+    if [[ -z $text ]]; then
+        notify-send -a "$app" 'Clipboard is empty' 'Copy a link or text first'
+        exit 1
+    fi
+    if ((${#text} > 1500)); then
+        notify-send -a "$app" 'Too long for a QR code' "${#text} characters; the limit here is 1500"
+        exit 1
+    fi
+    display_qr "$text"
+    ;;
+wifi)
+    name=$(nmcli -t -f NAME,TYPE connection show --active | awk -F: '$2 == "802-11-wireless" { print $1; exit }')
+    if [[ -z $name ]]; then
+        notify-send -a "$app" 'Not on Wi-Fi' 'Connect to a wireless network first'
+        exit 1
+    fi
+    ssid=$(nmcli -g 802-11-wireless.ssid connection show "$name")
+    password=$(nmcli -s -g 802-11-wireless-security.psk connection show "$name" 2>/dev/null || true)
+    if [[ -n $password ]]; then
+        display_qr "WIFI:T:WPA;S:$(wifi_escape "$ssid");P:$(wifi_escape "$password");;"
+    else
+        display_qr "WIFI:T:nopass;S:$(wifi_escape "$ssid");;"
+    fi
+    ;;
+*)
+    echo "usage: desktop-qr read|show|wifi" >&2
+    exit 2
+    ;;
+esac

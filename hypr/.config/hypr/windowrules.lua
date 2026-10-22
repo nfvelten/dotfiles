@@ -334,3 +334,15 @@ hl.window_rule({
     match = { class = "^(org\\.pwmt\\.zathura|Zathura|zathura)$" },
     opacity = "1.0 override 1.0 override 1.0 override",
 })
+
+-- QR codes from desktop-qr show/wifi: small, floating, centred.
+hl.window_rule({
+    name  = "yerba_qr_float",
+    match = {
+        class = "^imv$",
+        title = ".*yerba-qr.*",
+    },
+    float = true,
+    center = true,
+    size = { 520, 520 },
+})

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Copy text from a screen region: drag a region, OCR it with tesseract, copy the result.
+# Portuguese is used too when tesseract-data-por is installed.
+pkill -x slurp && exit 0
+
+langs=eng
+tesseract --list-langs 2>/dev/null | grep -qx por && langs=eng+por
+
+hyprpicker -r -z >/dev/null 2>&1 &
+freeze_pid=$!
+trap 'kill "$freeze_pid" 2>/dev/null || true' EXIT
+selection=$(slurp) || exit 0
+
+# Upscaling helps tesseract with small UI fonts.
+text=$(grim -g "$selection" -s 2 - | tesseract stdin stdout -l "$langs" --psm 6 2>/dev/null | sed -e 's/[[:space:]]*$//' | sed -e '/./,$!d')
+kill "$freeze_pid" 2>/dev/null || true
+trap - EXIT
+
+if [[ -z ${text//[[:space:]]/} ]]; then
+    notify-send -a 'Text from screen' 'No text found' 'Try a larger or sharper region'
+    exit 1
+fi
+
+printf '%s' "$text" | wl-copy
+notify-send -a 'Text from screen' "Copied $(wc -w <<<"$text") words" "${text:0:200}"

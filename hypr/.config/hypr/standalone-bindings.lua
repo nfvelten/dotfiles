@@ -120,11 +120,11 @@ hl.bind("SUPER + CTRL + L", hl.dsp.exec_cmd("loginctl lock-session"))
 -- Wake the display while the Quickshell lock surface is active.
 hl.bind("SUPER + CTRL + L", hl.dsp.exec_cmd("hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'"), { locked = true })
 
-hl.bind("SUPER + CTRL + W", hl.dsp.exec_cmd("ghostty -e nmtui"))
+hl.bind("SUPER + CTRL + W", hl.dsp.exec_cmd("quickshell ipc call yerba open network"))
 
-hl.bind("SUPER + CTRL + B", hl.dsp.exec_cmd("ghostty -e bluetui"))
+hl.bind("SUPER + CTRL + B", hl.dsp.exec_cmd("quickshell ipc call yerba open bluetooth"))
 
-hl.bind("SUPER + CTRL + A", hl.dsp.exec_cmd("ghostty -e wiremix"))
+hl.bind("SUPER + CTRL + A", hl.dsp.exec_cmd("quickshell ipc call yerba open audio"))
 
 hl.bind("SUPER + CTRL + X", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-power"))
 
@@ -136,9 +136,20 @@ hl.bind("SUPER + CTRL + V", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/de
 
 hl.bind("SUPER + CTRL + C", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-screenshot"))
 
+hl.bind("SUPER + CTRL + O", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-ocr"))
+
+hl.bind("SUPER + P", hl.dsp.exec_cmd("quickshell ipc call yerba open passwords"))
+
+hl.bind("SUPER + CTRL + Q", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-qr read"))
+
 hl.bind("SUPER + comma", hl.dsp.exec_cmd("quickshell ipc call notifications dismissOne"))
 
 hl.bind("SUPER + SHIFT + comma", hl.dsp.exec_cmd("quickshell ipc call notifications dismissAll"))
+
+hl.bind("SUPER + period", hl.dsp.exec_cmd("quickshell ipc call yerba open notifications"))
+
+-- Open the newest notification that has an action (e.g. jump to the Claude pane that finished).
+hl.bind("SUPER + SHIFT + period", hl.dsp.exec_cmd("quickshell ipc call notifications invokeLast"))
 
 hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd("ghostty -e deck status"))
 
@@ -164,11 +175,11 @@ hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl set +5%"), { repea
 
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"), { repeating = true, locked = true })
 
-hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"))
+hl.bind("XF86AudioPlay", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/media-key play-pause"))
 
-hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"))
+hl.bind("XF86AudioNext", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/media-key next"))
 
-hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"))
+hl.bind("XF86AudioPrev", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/media-key previous"))
 
 -- Screenshots
 

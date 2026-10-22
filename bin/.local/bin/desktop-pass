@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# password-store for the Yerba dock.
+#   desktop-pass copy <entry> [password|username|notes|key:<name>]
+#   desktop-pass fields <entry>   reopen the dock listing the entry's field names
+# Entries follow the pass convention: password on the first line, then "name: value"
+# lines (url:, login:, pin:…) and free-text notes.
+# A copied value goes to the clipboard as sensitive (cliphist skips it) and is cleared after
+# PASSWORD_STORE_CLIP_TIME seconds (default 45) unless something else was copied since.
+# Values never appear in arguments, notifications or files; `fields` only sends names.
+app='Passwords'
+store=${PASSWORD_STORE_DIR:-$HOME/.password-store}
+clip_time=${PASSWORD_STORE_CLIP_TIME:-45}
+username_keys='login|user|username|email'
+
+action=${1:-}
+entry=${2:-}
+field=${3:-password}
+
+if [[ ($action != copy && $action != fields) || -z $entry ]]; then
+    echo "usage: desktop-pass copy <entry> [password|username|notes|key:<name>] | fields <entry>" >&2
+    exit 2
+fi
+if [[ $entry == /* || $entry == *..* || ! -f $store/$entry.gpg ]]; then
+    notify-send -a "$app" 'Unknown entry' "$entry"
+    exit 1
+fi
+
+# `fields` runs with the dock open: first try without pinentry (works while gpg-agent has
+# the passphrase cached). Otherwise close the dock so the graphical pinentry can take the
+# keyboard; the dock reopens with the field names afterwards.
+content=''
+if [[ $action == fields ]]; then
+    content=$(PASSWORD_STORE_GPG_OPTS="--pinentry-mode error ${PASSWORD_STORE_GPG_OPTS:-}" pass show -- "$entry" 2>/dev/null) ||
+        quickshell ipc call yerba closeMenu
+fi
+if [[ -z $content ]] && ! content=$(pass show -- "$entry" 2>/dev/null); then
+    notify-send -a "$app" 'Could not decrypt' "$entry"
+    exit 1
+fi
+
+# "name: value" lines after the password. URLs (https://…) are text, not a "https" field.
+keys=()
+notes=()
+values=()
+while IFS= read -r line; do
+    if [[ $line =~ ^[[:space:]]*([^:/]{1,40}):[[:space:]]*(.*)$ && ${BASH_REMATCH[2]} != //* && -n ${BASH_REMATCH[2]} ]]; then
+        key=${BASH_REMATCH[1]}
+        key=${key%"${key##*[![:space:]]}"}
+        keys+=("$key")
+        values+=("${BASH_REMATCH[2]}")
+    elif [[ $line =~ [^[:space:]] ]]; then
+        notes+=("$line")
+    fi
+done < <(tail -n +2 <<<"$content")
+
+if [[ $action == fields ]]; then
+    unset content values
+    names=(password username)
+    for key in "${keys[@]}"; do
+        shopt -s nocasematch
+        [[ $key =~ ^($username_keys)$ ]] || names+=("key:$key")
+        shopt -u nocasematch
+    done
+    ((${#notes[@]})) && names+=(notes)
+    # The quickshell CLI splits arguments on commas: percent-encode them (and %), join with tabs.
+    encode() {
+        local s=${1//%/%25}
+        printf '%s' "${s//,/%2C}"
+    }
+    encoded=()
+    for name in "${names[@]}"; do encoded+=("$(encode "$name")"); done
+    quickshell ipc call yerba passFields "$(encode "$entry")" "$(IFS=$'\t' && echo "${encoded[*]}")"
+    exit 0
+fi
+
+value=''
+case $field in
+password)
+    value=$(head -n1 <<<"$content")
+    label='Password'
+    ;;
+username)
+    shopt -s nocasematch
+    for i in "${!keys[@]}"; do
+        if [[ ${keys[i]} =~ ^($username_keys)$ ]]; then
+            value=${values[i]}
+            break
+        fi
+    done
+    shopt -u nocasematch
+    value=${value:-${entry##*/}}
+    label='Username'
+    ;;
+notes)
+    value=$(printf '%s\n' "${notes[@]}")
+    label='Notes'
+    ;;
+key:*)
+    wanted=${field#key:}
+    for i in "${!keys[@]}"; do
+        if [[ ${keys[i],,} == "${wanted,,}" ]]; then
+            value=${values[i]}
+            break
+        fi
+    done
+    label=$wanted
+    ;;
+*)
+    echo "unknown field: $field" >&2
+    exit 2
+    ;;
+esac
+unset content values notes
+
+if [[ -z $value ]]; then
+    notify-send -a "$app" "Nothing to copy for $label" "$entry"
+    exit 1
+fi
+
+printf '%s' "$value" | wl-copy --sensitive
+expected=$(printf '%s' "$value" | sha256sum)
+unset value
+notify-send -a "$app" "$label copied" "$entry · clears in ${clip_time}s"
+
+# Clear later, but only if the clipboard still holds this secret.
+(
+    sleep "$clip_time"
+    if [[ $(wl-paste -n 2>/dev/null | sha256sum) == "$expected" ]]; then
+        wl-copy --clear
+    fi
+) >/dev/null 2>&1 &
+disown
