@@ -297,7 +297,7 @@ hl.window_rule({
     match = {
         title = "^__scratchtmux$",
     },
-    size = { "monitor_w*0.8", "monitor_h*0.79" },
+    size = { "monitor_w*0.94", "monitor_h*0.92" },
 })
 
 hl.window_rule({

@@ -1,12 +1,17 @@
 #!/bin/bash
 # Resize and re-center a scratchpad after it is toggled into view.
+#
+#   scratchpad-center TITLE [WIDTH_FRACTION HEIGHT_FRACTION]   (default 0.8 x 0.79 of the monitor)
 
 title="$1"
+fw="${2:-0.8}"
+fh="${3:-0.79}"
 window=$(hyprctl activewindow -j)
 [[ "$(jq -r '.title // empty' <<<"$window")" == "$title" ]] || exit 0
 
 read -r width height < <(hyprctl monitors -j | jq -r --argjson id "$(jq '.monitor' <<<"$window")" \
-    '.[] | select(.id == $id) | "\(.width / .scale * 0.8 | floor) \(.height / .scale * 0.79 | floor)"')
+    --argjson fw "$fw" --argjson fh "$fh" \
+    '.[] | select(.id == $id) | "\(.width / .scale * $fw | floor) \(.height / .scale * $fh | floor)"')
 
 hyprctl eval "hl.dispatch(hl.dsp.window.resize({ x = $width, y = $height, window = \"title:^$title\$\" }))" >/dev/null
 hyprctl eval 'hl.dispatch(hl.dsp.window.center())' >/dev/null

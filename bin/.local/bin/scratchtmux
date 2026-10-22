@@ -21,12 +21,12 @@ if hyprctl clients -j | jq -e '.[] | select(.workspace.name == "special:scratcht
     if ! $show_only || ! hyprctl monitors -j | jq -e '.[] | select(.specialWorkspace.name == "special:scratchtmux")' >/dev/null; then
         "$HOME/.local/bin/hypr-toggle-special" scratchtmux
     fi
-    "$HOME/.local/bin/scratchpad-center" __scratchtmux
+    "$HOME/.local/bin/scratchpad-center" __scratchtmux 0.94 0.92
 else
     ghostty --title=__scratchtmux -e tmux attach-session -t "$session" >/dev/null 2>&1 &
     sleep 0.5
     if ! $show_only || ! hyprctl monitors -j | jq -e '.[] | select(.specialWorkspace.name == "special:scratchtmux")' >/dev/null; then
         "$HOME/.local/bin/hypr-toggle-special" scratchtmux
     fi
-    "$HOME/.local/bin/scratchpad-center" __scratchtmux
+    "$HOME/.local/bin/scratchpad-center" __scratchtmux 0.94 0.92
 fi
