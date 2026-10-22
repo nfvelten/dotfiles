@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Repo hygiene. `scripts/lint` checks every tracked file; `--staged` only what is about to be
+# committed (the pre-commit hook). Public repo: secrets and work data must never get in.
+set -u
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if [[ ${1:-} == --staged ]]; then
+    mapfile -t files < <(git diff --cached --name-only --diff-filter=ACMR)
+    diff_text() { git diff --cached -U0 -- . ':!scripts/lint'; }
+else
+    mapfile -t files < <(git ls-files)
+    diff_text() { git ls-files -z -- . ':!scripts/lint' | xargs -0 cat 2>/dev/null; }
+fi
+fail=0
+bad() {
+    printf '%s\n' "$*"
+    fail=1
+}
+
+for f in "${files[@]}"; do
+    [[ -f $f ]] || continue
+    head -c 2 "$f" | grep -q '^#!' || continue
+    # Scripts run by path (bindings, hooks, tmux) must be committed executable. Python
+    # bridges started as `python3 file.py` don't need it.
+    if [[ $f == bin/* || $f == scripts/* || $f == .githooks/* || $f == *.sh ]]; then
+        mode=$(git ls-files -s -- "$f" | cut -d' ' -f1)
+        [[ $mode == 100755 ]] || bad "not executable in git: $f (git update-index --chmod=+x $f)"
+    fi
+    if head -1 "$f" | grep -Eq '(ba|z)?sh\b'; then
+        shellcheck -S warning "$f" >/dev/null || bad "shellcheck: $f (shellcheck -S warning $f)"
+    fi
+done
+
+# Credentials and work data (see CLAUDE.md: public repo).
+if leaks=$(diff_text | grep -En -i 'BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20}|glpat-[A-Za-z0-9_-]{20}|xox[abp]-[A-Za-z0-9-]{10}|sk-[A-Za-z0-9_-]{20}|AKIA[0-9A-Z]{16}|alloha|sumicity|illegra'); then
+    bad "possible secret or work data:"
+    printf '  %s\n' "${leaks:0:2000}"
+fi
+
+# Quickshell: the running shell reloads on save; its last reload must not have logged errors.
+if printf '%s\n' "${files[@]}" | grep -q '^quickshell/' && systemctl --user is-active --quiet quickshell.service; then
+    errors=$(journalctl --user -u quickshell.service --since '-30 min' -o cat --no-pager |
+        awk '/Reloading configuration|Configuration Loaded/ { buf = "" } { buf = buf $0 "\n" } END { printf "%s", buf }' |
+        grep -E 'ERROR|ReferenceError|TypeError|is not a type' | head -5)
+    [[ -z $errors ]] || bad "quickshell errors since last reload:"$'\n'"$errors"
+fi
+
+exit "$fail"

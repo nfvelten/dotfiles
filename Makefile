@@ -1,6 +1,6 @@
 SHELL := /usr/bin/bash
 
-.PHONY: bootstrap packages sync-layers install-core install-desktop install-development install-optional install-aur user-services theme theme-dark theme-light check doctor snapshot restore org-status org-backup backup
+.PHONY: bootstrap packages sync-layers install-core install-desktop install-development install-optional install-aur user-services theme theme-dark theme-light check lint hooks doctor snapshot restore org-status org-backup backup
 
 bootstrap: packages user-services check
 
@@ -41,6 +41,14 @@ theme-light:
 
 check:
 	@scripts/check-setup
+
+# Repo hygiene: shellcheck, exec bits, secrets/work data, Quickshell reload errors.
+lint:
+	@scripts/lint
+
+# Run scripts/lint on staged files before every commit.
+hooks:
+	@git config core.hooksPath .githooks
 
 doctor: check
 	@hyprctl configerrors

@@ -2,7 +2,7 @@
 set -u
 
 show_only=false
-session=org-agents
+session="org-agents"
 if [[ ${1:-} == --show ]]; then
     show_only=true
     session=${2:-org-agents}
