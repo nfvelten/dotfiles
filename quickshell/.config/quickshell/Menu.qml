@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import "Actions.js" as Actions
 
@@ -14,6 +15,54 @@ PanelWindow {
     required property QtObject org
     required property QtObject clipboard
     required property QtObject notifications
+    property QtObject meeting: null
+    property QtObject yerbad: null
+    // password-store entry names only (via yerbad pass.list); secrets are copied by desktop-pass.
+    property var passEntries: []
+    property bool passLoading: false
+    function loadPasswords() {
+        if (passLoading || !yerbad) return
+        passLoading = yerbad.request("pass.list", function(err, result) {
+            panel.passLoading = false
+            panel.passEntries = err ? [] : result
+        })
+        // Daemon (re)starting: try again shortly while the page is open.
+        if (!passLoading) passRetry.restart()
+    }
+    Timer { id: passRetry; interval: 1000; onTriggered: { if (panel.isOpen && panel.route === "passwords") panel.loadPasswords() } }
+    // Field names of one entry, sent back by `desktop-pass fields` after decrypting (values stay there).
+    property string passFieldsFor: ""
+    property var passFieldNames: []
+    // Enter on an entry: show its fields in place. desktop-pass decrypts (pinentry only if the
+    // passphrase isn't cached) and answers through the passFields IPC call.
+    function openPassFields(entry) {
+        passFieldsFor = ""
+        passFieldNames = []
+        contextItem = {title: entry.split("/").pop(), passEntry: entry}
+        selected = 0
+        Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/desktop-pass", "fields", entry])
+    }
+    function showPassFields(entry, names) {
+        // Reopened after pinentry (or opened from outside): rebuild the page around the entry.
+        if (!(route === "passwords" && contextItem && contextItem.passEntry === entry)) {
+            navigate("passwords")
+            contextItem = {title: entry.split("/").pop(), passEntry: entry}
+        }
+        passFieldsFor = entry
+        passFieldNames = names
+        selected = 0
+    }
+    function passFieldTitle(name) {
+        if (name === "password") return "Copy password"
+        if (name === "username") return "Copy username"
+        if (name === "notes") return "Copy notes"
+        return "Copy " + name.slice(4)
+    }
+    function copyPass(entry, field) {
+        panel.closeRequested()
+        // Let the dock release keyboard focus before pinentry may ask for the GPG passphrase.
+        Quickshell.execDetached(["bash", "-c", "sleep 0.3; exec \"$0\" copy \"$1\" \"$2\"", Quickshell.env("HOME") + "/.local/bin/desktop-pass", entry, field])
+    }
     required property QtObject feed
     required property QtObject media
     property bool isOpen: false
@@ -49,30 +98,36 @@ PanelWindow {
                 return panel.route === "audio" ? "Audio" : panel.route === "bluetooth" ? "Bluetooth" : panel.route === "network" ? "Network" : "System controls"
             if (panel.route === "notes") return "Search Org notes…"
             if (panel.route === "clipboard") return "Search clipboard…"
+            if (panel.route === "notifications") return "Search notifications…"
+            if (panel.route === "passwords") return "Search passwords…"
             return "Notes, apps and actions…"
         }
         var labels = {
             notes: "Search Org notes", clipboard: "Search clipboard", applications: "Search apps",
             tmux: "Filter tmux windows", audio: "Audio", bluetooth: "Bluetooth",
-            network: "Network", controls: "System controls"
+            network: "Network", controls: "System controls", notifications: "Search notifications", passwords: "Search passwords"
         }
         return "/  " + (labels[panel.route] || "Search notes, apps and actions")
     }
     function sectionTitle() {
         if (panel.route === "tmux") return "tmux sessions and windows"
-        if (panel.contextItem) return "Actions · " + panel.contextItem.title
+        if (panel.contextItem) return "Actions · " + panel.contextItem.title.replace(/^● /, "")
         if (panel.route === "notes") return "Org notes"
         if (panel.pending) return "Confirmation"
         if (panel.route === "clipboard") return "Clipboard"
         if (panel.route === "applications") return "Applications"
+        if (panel.route === "notifications") return "Notifications · " + notifications.historyEntries.length + " saved"
+        if (panel.route === "passwords") return "Passwords · " + panel.passEntries.length + " entries"
         if (panel.route === "main" && panel.query.trim()) return "Apps · Actions · Agents · Notes"
         return "Commands"
     }
     function footerHint() {
         if (panel.route === "calendar") return "hjkl day/week    [ ] month    g today    J K event    ? keys"
-        if (panel.route === "media") return "↑ ↓ select    Enter play    / search    u queue    r recent    ? keys"
+        if (panel.route === "media") return "↑ ↓ select    Enter play    Space play/pause    Tab player    / search    ? keys"
         if (panel.route === "boards") return "↑ ↓ select    Enter/o details    r refresh    Esc back"
         if (panel.route === "tmux") return "j k select    Enter/e resume in Super + C    ? keys"
+        if (panel.route === "notifications") return "j k select    Enter open/copy    Ctrl+K actions    / search    ? keys"
+        if (panel.route === "passwords") return panel.contextItem ? "↑ ↓ select    Enter copy    Esc back to list" : "↑ ↓ select    Enter show fields    Esc back"
         if (panel.route === "preferences") return "j k select    Enter toggle    ? keys    Esc back"
         if (panel.route === "themes") return "↑ ↓ select    Enter apply    Esc back"
         if (["controls", "audio", "bluetooth", "network"].indexOf(panel.route) >= 0)
@@ -97,11 +152,14 @@ PanelWindow {
         if (item.tmuxWindow) return "tmux"
         if (item.orgPath) return "Org"
         if (item.clipboardId) return item.kind
+        if (item.historyKey) return item.historyApp
+        if (item.passEntry) return "Password"
         if (item.desktopId) return "App"
         if (item.route) return "Menu"
         return "Action"
     }
     function emptyMessage() {
+        if (panel.route === "passwords") return panel.passLoading ? "Loading passwords…" : "No passwords found"
         if (panel.route === "clipboard" && panel.clipboard.loading) return "Loading clipboard…"
         if (panel.route === "clipboard" && panel.clipboard.error) return panel.clipboard.error
         if (panel.org.loading) return "Searching notes…"
@@ -122,23 +180,102 @@ PanelWindow {
         rows.push({title: "Network", hint: "Wi-Fi and Ethernet", label: "w", group: "ATALHOS", route: "network"})
         return rows
     }
-    onQueryChanged: { if (org) org.search((route === "main" || route === "notes") ? query : "") }
+    onQueryChanged: {
+        // "notes: x", "clip: x", "tmux: x", "apps: x", "notif: x" jump to that page with x as the query.
+        var prefix = route === "main" ? /^(notes|clip|tmux|apps|notif|pass):\s*(.*)$/i.exec(query) : null
+        if (prefix) {
+            var target = {notes: "notes", clip: "clipboard", tmux: "tmux", apps: "applications", notif: "notifications", pass: "passwords"}[prefix[1].toLowerCase()]
+            var rest = prefix[2]
+            navigate(target)
+            query = rest
+            Qt.callLater(focusSearch)
+            return
+        }
+        if (org) org.search((route === "main" || route === "notes") ? query : ""); copyCalcWhenReady = false; calcDebounce.restart()
+    }
+    // Calculator: qalc answers math-looking queries ("15*1.08", "10 usd to brl", "sqrt(2)").
+    // Plain words never reach it, since qalc reads them as units ("hello" -> e·B·h·L²).
+    property string calcResult: ""
+    property string calcFor: ""
+    property bool copyCalcWhenReady: false
+    function copyCalc(value) { copyCalcWhenReady = false; Quickshell.execDetached(["wl-copy", value]); panel.closeRequested() }
+    function looksLikeMath(text) {
+        var t = text.trim()
+        var start = /^([-+(.\d]|(sqrt|cbrt|sin|cos|tan|log|ln|abs|round|floor|ceil)\s*\()/i.test(t)
+        return start && /[-+*\/^%×÷()]|\s(to|in)\s/i.test(t)
+    }
+    Timer {
+        id: calcDebounce
+        interval: 120
+        onTriggered: {
+            panel.calcResult = ""
+            if (panel.route !== "main" || !panel.looksLikeMath(panel.query)) return
+            calcProcess.running = false
+            calcProcess.expression = panel.query.trim()
+            calcProcess.command = ["qalc", "-t", "-set", "max decimals 4", calcProcess.expression]
+            calcProcess.running = true
+        }
+    }
+    Process {
+        id: calcProcess
+        property string expression: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var lines = text.trim().split("\n").filter(function(l) { return l && !/^(error|warning)/i.test(l) })
+                var result = lines.length ? lines[lines.length - 1].trim() : ""
+                if (calcProcess.expression !== panel.query.trim() || !result || result === calcProcess.expression) return
+                panel.calcFor = calcProcess.expression
+                panel.calcResult = result
+                if (panel.copyCalcWhenReady) panel.copyCalc(result)
+            }
+        }
+    }
     property int selected: 0
     readonly property var rows: filtered()
     onIsOpenChanged: {
+        if (isOpen && route === "notifications") enterNotifications()
+        if (isOpen && route === "passwords") loadPasswords()
         if (!org || !clipboard) return
         if (isOpen) {
             org.error = ""; org.message = ""; openRefresh.restart()
             query = ""; selected = 0; helpVisible = false
-            Qt.callLater(keyFocus); Qt.callLater(function() { results.positionViewAtBeginning() })
+            // Search pages (opened by IPC/shortcut, e.g. Super+P) take typing right away.
+            Qt.callLater(searchRoutes.indexOf(route) >= 0 ? focusSearch : keyFocus); Qt.callLater(function() { results.positionViewAtBeginning() })
         } else {
             morph = null; morphItem = null; morphAction = null; contextItem = null
             route = "main"; pending = null; clipboard.requestPreview(""); org.tmux.preview(null)
         }
     }
     Component.onCompleted: { if (isOpen) { org.refresh(); keyFocus() } }
+    // Unread dots compare against seenAt from before this visit; the visit itself marks all seen.
+    property double notificationsSeenBefore: 0
+    function enterNotifications() { notificationsSeenBefore = notifications.seenAt; notifications.markSeen() }
+    function ago(t) {
+        var m = Math.round((Date.now() - t) / 60000)
+        return m < 1 ? "now" : m < 60 ? m + " min" : m < 1440 ? Math.round(m / 60) + " h" : Math.round(m / 1440) + " d"
+    }
+    function notificationRows() {
+        var entries = notifications.historyEntries
+        // Group by app: apps ordered by their newest entry, newest first inside each app.
+        var latest = {}
+        entries.forEach(function(e) { latest[e.app] = Math.max(latest[e.app] || 0, e.time) })
+        return entries.slice().sort(function(a, b) { return (latest[b.app] - latest[a.app]) || (b.time - a.time) }).map(function(e) {
+            var fresh = e.time > notificationsSeenBefore
+            return {
+                title: (fresh ? "● " : "") + (e.title || "(no title)"),
+                subtitle: ago(e.time) + (e.body ? " · " + e.body.replace(/\s+/g, " ") : ""),
+                keywords: (e.app || "") + " " + (e.body || ""),
+                icon: e.icon || "preferences-system-notifications-symbolic",
+                historyKey: e.key, historyApp: e.app || "Notification", historyText: (e.title || "") + (e.body ? "\n" + e.body : "")
+            }
+        })
+    }
     onRouteChanged: {
+        if (lastRoute === "main" && route !== "main") mainState = {query: query, selected: selected}
+        lastRoute = route
         Qt.callLater(updatePreview)
+        if (route === "notifications" && isOpen) enterNotifications()
+        if (route === "passwords" && isOpen) loadPasswords()
         contextItem = null
         if (org) org.search((route === "main" || route === "notes") ? query : "")
         if (route === "tmux" && isOpen) org.tmux.refresh()
@@ -176,7 +313,7 @@ PanelWindow {
         route = destination; query = ""; selected = 0
     }
     // Gambito-style focus: the dock opens in key mode; / or i moves to search. Search-centric pages focus search on entry.
-    readonly property var searchRoutes: ["notes", "applications", "clipboard"]
+    readonly property var searchRoutes: ["notes", "applications", "clipboard", "passwords"]
     property bool helpVisible: false
     property int controlsColumn: 0
     function focusSearch() { search.forceActiveFocus() }
@@ -195,7 +332,8 @@ PanelWindow {
     function helpRows() {
         var all = [
             ["/  i", "Search"], ["?", "These keys"], ["Backspace", "Back one level"],
-            ["Esc", "Cancel / back"], ["q", "Close the dock"]
+            ["Esc", "Cancel / back"], ["q", "Close the dock"],
+            ["notes: clip: tmux:", "Search one source (also apps: notif:)"]
         ]
         if (dashboardVisible) {
             var dashboard = [
@@ -254,13 +392,23 @@ PanelWindow {
         morphInto({x: Math.round((width - w) / 2), y: Math.round(top + (height - top - h) / 2), w: w, h: h}, function() { panel.org.tmux.open(item, true) })
     }
     Timer { id: morphTimer; interval: 230; onTriggered: { if (panel.morphAction) panel.morphAction() } }
+    // Back returns to where you were: the row a Ctrl+K menu was opened from, and the main
+    // search (query + selection) a page was opened from. Prefix queries ("notes: x") aren't
+    // restored, since they would jump straight back to that page.
+    property int contextFrom: 0
+    onContextItemChanged: { if (contextItem) contextFrom = selected; else { passFieldsFor = ""; passFieldNames = [] } }
+    property string lastRoute: "main"
+    property var mainState: ({query: "", selected: 0})
     function goBack() {
-        if (contextItem) { contextItem = null; selected = 0; return }
+        if (contextItem) { var from = contextFrom; contextItem = null; selected = from; return }
         pending = null
+        var saved = mainState
         route = "main"
-        query = ""
-        selected = 0
-        Qt.callLater(keyFocus)
+        var prefixed = /^(notes|clip|tmux|apps|notif|pass):/i.test(saved.query)
+        query = prefixed ? "" : saved.query
+        selected = prefixed ? 0 : saved.selected
+        mainState = {query: "", selected: 0}
+        Qt.callLater(saved.query && !prefixed ? focusSearch : keyFocus)
     }
     readonly property var applicationCatalog: applicationRows()
     function applicationRows() {
@@ -277,6 +425,8 @@ PanelWindow {
         }).sort(function(a, b) { return a.title.localeCompare(b.title) })
     }
     function activate(index) {
+        // Enter typed faster than qalc answers: copy the result once it arrives.
+        if (route === "main" && looksLikeMath(query) && !(rows[0] && rows[0].calcValue !== undefined) && (calcProcess.running || calcDebounce.running)) { copyCalcWhenReady = true; return }
         var item = rows[index]
         if (!item) return
         if (item.tmuxWindow) { morphToTmux(item); return }
@@ -296,9 +446,36 @@ PanelWindow {
             contextItem = null; selected = 0
             return
         }
+        if (item.calcValue !== undefined) { copyCalc(item.calcValue); return }
+        if (item.passPending) return
+        if (item.passEntry) { openPassFields(item.passEntry); return }
+        if (item.passAction) {
+            var passItem = contextItem
+            contextItem = null; selected = 0
+            if (item.passAction === "edit") { Quickshell.execDetached(["ghostty", "-e", "pass", "edit", passItem.passEntry]); panel.closeRequested() }
+            else copyPass(passItem.passEntry, item.passAction)
+            return
+        }
+        if (item.ruleApp) { notifications.setRule(item.ruleApp, ""); return }
+        if (item.historyKey) {
+            // Live notification with a default action: run it. Otherwise copy its text.
+            if (!notifications.invokeDefault(notifications.liveFor(item.historyKey))) Quickshell.execDetached(["wl-copy", item.historyText])
+            panel.closeRequested(); return
+        }
+        if (item.historyAction) {
+            var entry = contextItem
+            contextItem = null; selected = 0
+            if (item.historyAction === "copy") { Quickshell.execDetached(["wl-copy", entry.historyText]); panel.closeRequested() }
+            else if (item.historyAction === "open") { notifications.invokeDefault(notifications.liveFor(entry.historyKey)); panel.closeRequested() }
+            else if (item.historyAction === "remove") notifications.removeEntry(entry.historyKey)
+            else if (item.historyAction === "clearApp") notifications.clearApp(entry.historyApp)
+            else if (item.historyAction.indexOf("rule:") === 0) notifications.setRule(entry.historyApp, item.historyAction.slice(5))
+            return
+        }
         if (item.orgPath) { org.run("open", [item.orgPath, String(item.orgLine)]); return }
         if (item.orgAction) { org.run(item.orgAction); return }
         if (item.toggleTopBar) { panel.toggleTopBarRequested(); return }
+        if (item.meetingAction !== undefined) { if (item.meetingAction) meeting.start(item.meetingAction); else meeting.stop(); panel.closeRequested(); return }
         if (item.clipboardId) { clipboard.copyEntry(item.clipboardId); return }
         if (item.desktopId) {
             var entry = DesktopEntries.byId(item.desktopId)
@@ -312,8 +489,9 @@ PanelWindow {
         }
         if (item.notificationAction) {
             if (item.notificationAction === "dnd") notifications.toggleDnd()
+            if (item.notificationAction === "dnd60") notifications.snoozeDnd(60)
             if (item.notificationAction === "clear") notifications.clearHistory()
-            if (item.notificationAction === "history") { panel.closeRequested(); notifications.historyOpen = true }
+            if (item.notificationAction === "history") { navigate("notifications"); return }
             return
         }
         if (item.cancel) { pending = null; return }
@@ -334,6 +512,20 @@ PanelWindow {
     function filtered() {
         var q = query.toLowerCase().trim()
         if (contextItem) {
+            if (contextItem.passEntry && passFieldsFor === contextItem.passEntry) return passFieldNames.map(function(name) {
+                return {title: passFieldTitle(name), subtitle: "Value stays hidden · clears from the clipboard after 45 s", passAction: name}
+            }).concat([{title: "Edit in terminal", subtitle: "pass edit " + contextItem.passEntry, passAction: "edit"}])
+            if (contextItem.passEntry) return [{title: "Decrypting…", subtitle: "Your GPG passphrase may be asked", passPending: true}]
+            if (contextItem.historyKey) return (notifications.liveFor(contextItem.historyKey) ? [{title: "Open", subtitle: "Run the notification's default action", historyAction: "open"}] : []).concat([
+                {title: "Copy text", subtitle: "Title and body to the clipboard", historyAction: "copy"},
+                {title: "Dismiss", subtitle: "Remove from history", historyAction: "remove"},
+                {title: "Clear all from " + contextItem.historyApp, subtitle: "Remove every entry from this app", historyAction: "clearApp"}
+            ]).concat(notifications.ruleFor(contextItem.historyApp) === "mute"
+                ? [{title: "Unmute " + contextItem.historyApp, subtitle: "Show its popups again", historyAction: "rule:"}]
+                : [{title: "Mute " + contextItem.historyApp, subtitle: "Keep in history, no popups (critical ones still show)", historyAction: "rule:mute"}]
+            ).concat(notifications.ruleFor(contextItem.historyApp) === "always"
+                ? [{title: "Stop always showing " + contextItem.historyApp, subtitle: "Follow Do not disturb again", historyAction: "rule:"}]
+                : [{title: "Always show " + contextItem.historyApp, subtitle: "Pop up even during Do not disturb", historyAction: "rule:always"}])
             if (contextItem.tmuxWindow) return [
                 {title: "Resume in Super + C", tmuxAction: "resume"},
                 {title: "Open session directory", tmuxAction: "directory"},
@@ -351,6 +543,13 @@ PanelWindow {
         if (pending) return [{title: "Cancel", cancel: true}, {title: "Confirm " + pending.title, command: pending.command}]
         var source = route === "power" ? Actions.power() : Actions.all()
         if (route === "tmux") source = org.tmux.entries
+        if ((route === "main" || route === "actions") && meeting) source = source.concat(meeting.active ? [{
+            title: "Meeting mode: on until " + Qt.formatTime(new Date(meeting.until), "HH:mm"), subtitle: "Enter ends it now",
+            keywords: "meeting call focus dnd stop end", icon: "camera-web", meetingAction: 0
+        }] : [30, 60].map(function(minutes) { return {
+            title: "Meeting mode · " + minutes + " min", subtitle: "Do not disturb and no sleep, then back to normal",
+            keywords: "meeting call focus dnd sleep inhibit", icon: "camera-web", meetingAction: minutes
+        } }))
         if (route === "main" || route === "actions") source = source.concat([{
             title: "Show top bar: " + (panel.showTopBar ? "On" : "Off"),
             keywords: "topbar bar dock painel desktop toggle",
@@ -359,21 +558,33 @@ PanelWindow {
         }])
         var notificationActions = [
             {
-                title: "Do not disturb: " + (notifications.dnd ? "On" : "Off"),
+                title: "Do not disturb: " + (notifications.dnd ? "On" + (notifications.dndUntil > 0 ? " until " + Qt.formatTime(new Date(notifications.dndUntil), "HH:mm") : "") : "Off"),
                 subtitle: "Suppress non-critical popups", keywords: "Toggle notification popups", notificationAction: "dnd"
             },
             {
-                title: "Notification history", subtitle: notifications.historyEntries.length + " saved this session",
-                keywords: "Recent notifications from this session", notificationAction: "history"
+                title: "Do not disturb for 1 hour", subtitle: "Turns itself off at " + Qt.formatTime(new Date(Date.now() + 3600000), "HH:mm"),
+                keywords: "Snooze notification popups dnd timer meeting focus", notificationAction: "dnd60"
+            },
+            {
+                title: "Notification center", subtitle: notifications.historyEntries.length + " saved" + (notifications.unread ? " · " + notifications.unread + " unread" : ""),
+                keywords: "Recent notifications history inbox", notificationAction: "history"
             },
             {
                 title: "Clear notification history", subtitle: "Remove saved notification entries",
                 keywords: "Forget recent notification entries", notificationAction: "clear"
             }
         ]
-        if (route === "notifications") source = notificationActions
+        if (route === "notifications") source = notificationRows().concat(notificationActions.filter(function(a) { return a.notificationAction !== "history" }))
+            .concat(Object.keys(notifications.appRules).map(function(app) {
+                var muted = notifications.appRules[app] === "mute"
+                return {title: (muted ? "Muted: " : "Always shown: ") + app, subtitle: "Enter removes this rule", keywords: "rule mute always " + app,
+                        icon: "preferences-system-notifications-symbolic", ruleApp: app}
+            }))
         else if (q && route === "main") source = source.concat(notificationActions)
         if (route === "clipboard") source = clipboard.entries
+        if (route === "passwords") source = passEntries.map(function(e) {
+            return {title: e.leaf, subtitle: e.folder || "password-store", keywords: e.name, icon: "dialog-password", passEntry: e.name}
+        })
         if (route === "applications") source = applicationCatalog
         else if (q && route === "main") {
             // Keep established actions (e.g. the scratch editor) ahead of same-name apps.
@@ -400,7 +611,8 @@ PanelWindow {
         })
         var notes = org.entries.slice(0, 5)
         if (org.entries.length) notes.push({title: "Search all notes for “" + query.trim() + "”", subtitle: "Notes page · o", icon: "edit-find", notesQuery: query.trim()})
-        return matches.concat(agents).concat(notes)
+        var calc = calcResult && calcFor === query.trim() ? [{title: calcResult, subtitle: "= " + calcFor + " · Enter copies", icon: "accessories-calculator", calcValue: calcResult}] : []
+        return calc.concat(matches).concat(agents).concat(notes)
     }
 
     Connections {
@@ -438,6 +650,9 @@ PanelWindow {
         visible: !panel.showTopBar && !panel.transitionOnly
         theme: panel.theme
         time: panel.time
+        dnd: panel.notifications.dnd
+        meeting: !!panel.meeting && panel.meeting.active
+        unread: panel.notifications.unread
         onControlsRequested: function(column) { panel.openControls(column) }
         opacity: panel.morph ? 0 : 1
         Behavior on opacity { enabled: !panel.morphInstant; NumberAnimation { duration: 120 } }
@@ -525,7 +740,7 @@ PanelWindow {
                 Keys.onPressed: function(event) {
                     if (event.key === Qt.Key_K && (event.modifiers & Qt.ControlModifier)) {
                         var item = panel.rows[panel.selected]
-                        if (item && item.orgPath) { panel.contextItem = item; panel.selected = 0 }
+                        if (item && (item.orgPath || item.historyKey)) { panel.contextItem = item; panel.selected = 0 }
                         event.accepted = true
                     }
                     if (event.key === Qt.Key_Left && (event.modifiers & Qt.AltModifier)) {
@@ -533,7 +748,8 @@ PanelWindow {
                         event.accepted = true
                     }
                 }
-                Keys.onEscapePressed: { if (panel.query) panel.query = ""; panel.keyFocus() }
+                // In a context list (password fields, note actions) Esc goes straight back to the list.
+                Keys.onEscapePressed: { if (panel.contextItem) { panel.goBack(); return } if (panel.query) panel.query = ""; panel.keyFocus() }
                 Keys.onDownPressed: panel.selected = Math.min(panel.rows.length - 1, panel.selected + 1)
                 Keys.onUpPressed: panel.selected = Math.max(0, panel.selected - 1)
                 Keys.onReturnPressed: panel.activate(panel.selected)
@@ -926,7 +1142,7 @@ PanelWindow {
                 else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) panel.activate(panel.selected)
                 else if (event.key === Qt.Key_K && (event.modifiers & Qt.ControlModifier)) {
                     var item = panel.rows[panel.selected]
-                    if (item && (item.orgPath || item.tmuxWindow)) {
+                    if (item && (item.orgPath || item.tmuxWindow || item.historyKey)) {
                         panel.contextItem = item
                         panel.selected = 0
                     }

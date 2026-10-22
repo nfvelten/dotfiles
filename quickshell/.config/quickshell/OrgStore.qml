@@ -5,7 +5,8 @@ import Quickshell.Io
 
 Scope {
     id: store
-    TmuxStore { id: tmuxStore }
+    property QtObject yerbad: null
+    TmuxStore { id: tmuxStore; yerbad: store.yerbad }
     property alias tmux: tmuxStore
     property var entries: []
     property var home: ({tasks: [], taskCount: 0, recent: []})
@@ -46,7 +47,22 @@ Scope {
         if (wantedQuery) debounce.restart()
         else debounce.stop()
     }
-    function refresh() { tmuxStore.refresh(); if (!homeProcess.running) homeProcess.running = true }
+    // Shared yerbad first (~11 ms); Python bridge as fallback.
+    property bool homeBusy: false
+    function refresh() {
+        tmuxStore.refresh()
+        if (homeBusy || homeProcess.running) return
+        var asked = yerbad && yerbad.request("org.home", function(err, result) {
+            store.homeBusy = false
+            store.applyHome(err ? {error: err} : result)
+        })
+        if (asked) homeBusy = true
+        else homeProcess.running = true
+    }
+    function applyHome(data) {
+        if (data.error) store.error = data.error
+        else store.home = data
+    }
     // khal takes ~5s: refresh in the background instead of on every dock open.
     Timer { interval: 900000; running: true; repeat: true; triggeredOnStart: true; onTriggered: store.refreshCalendar() }
     function refreshCalendar() {
@@ -126,11 +142,7 @@ Scope {
         command: ["python3", store.helper, "home"]
         stdout: StdioCollector {
             onStreamFinished: {
-                try {
-                    var data = JSON.parse(text)
-                    if (data.error) store.error = data.error
-                    else store.home = data
-                } catch (e) { store.error = "Could not load Org summary" }
+                try { store.applyHome(JSON.parse(text)) } catch (e) { store.error = "Could not load Org summary" }
             }
         }
     }

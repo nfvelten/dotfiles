@@ -5,7 +5,7 @@ Scope {
     id: store
     property var entries: []
     property string error: ""
-    readonly property bool loading: reader.running
+    readonly property bool loading: reader.running || daemonBusy
     readonly property bool busy: opener.running
     readonly property var sessions: {
         var groups = []
@@ -133,7 +133,25 @@ Scope {
         }
     }
     signal opened()
-    function refresh() { if (!reader.running) { error = ""; reader.running = true } }
+    // Shared yerbad (resident Rust daemon) answers in ~11 ms; the Python bridge is the
+    // fallback when the binary is missing or the daemon died.
+    property QtObject yerbad: null
+    property bool daemonBusy: false
+    function refresh() {
+        if (daemonBusy) return
+        var asked = yerbad && yerbad.request("tmux.list", function(err, result) {
+            store.daemonBusy = false
+            store.error = err
+            if (!err) store.applyListing(result)
+        })
+        if (asked) daemonBusy = true
+        else if (!reader.running) { error = ""; reader.running = true }
+    }
+    function applyListing(data) {
+        var rows = Array.isArray(data) ? store.withStatus(data) : []
+        var snapshot = JSON.stringify(rows)
+        if (snapshot !== store.entriesSnapshot) { store.entriesSnapshot = snapshot; store.entries = rows }
+    }
     // noAnim: the dock already morphed into the scratchpad's rect, so skip Hyprland's slide.
     function open(item, noAnim) {
         if (opener.running) return
@@ -148,9 +166,7 @@ Scope {
             onStreamFinished: {
                 try {
                     var data = JSON.parse(text)
-                    var rows = Array.isArray(data) ? store.withStatus(data) : []
-                    var snapshot = JSON.stringify(rows)
-                    if (snapshot !== store.entriesSnapshot) { store.entriesSnapshot = snapshot; store.entries = rows }
+                    store.applyListing(data)
                     store.error = data.error || ""
                 }
                 catch (e) { store.error = "Could not list tmux" }

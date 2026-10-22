@@ -12,7 +12,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from PIL import Image
 
 CONFIG = Path(os.environ.get("SPOTIFY_PLAYER_CONFIG", str(Path.home() / ".config/spotify-player/app.toml")))
 CACHE = Path(os.environ.get("SPOTIFY_PLAYER_CACHE", str(Path.home() / ".cache/spotify-player")))
@@ -29,6 +28,7 @@ def cache_art(url):
             ART_CACHE.mkdir(parents=True, exist_ok=True)
             request = urllib.request.Request(url, headers={"User-Agent": "yerba-shell"})
             raw = urllib.request.urlopen(request, timeout=8).read(8 * 1024 * 1024)
+            from PIL import Image  # only on a cache miss: importing PIL costs ~260 ms per call
             image = Image.open(io.BytesIO(raw)).convert("RGB")
             image.thumbnail((1200, 1200))
             image.save(path, format="PNG", optimize=True)
@@ -142,9 +142,17 @@ def playlist_tracks(playlist_id):
 
 def local_play(command):
     """Wake the lightweight Spotify device before using its local playback CLI."""
-    subprocess.run(["spotify_player", "connect", "--name", "spotify-player"],
-                   capture_output=True, text=True, timeout=12)
-    local = subprocess.run(command, capture_output=True, text=True, timeout=15)
+    connect = ["spotify_player", "connect", "--name", "spotify-player"]
+    woke = subprocess.run(connect, capture_output=True, text=True, timeout=12)
+    if "No device" in woke.stderr:
+        # The daemon stays alive but loses its Connect device after a failed
+        # session renewal (e.g. DNS outage), so only a restart brings it back.
+        subprocess.run(["systemctl", "--user", "restart", "spotify-player.service"], timeout=15)
+        for _ in range(15):
+            time.sleep(1)
+            if subprocess.run(connect, capture_output=True, text=True, timeout=12).returncode == 0:
+                break
+    local =subprocess.run(command, capture_output=True, text=True, timeout=15)
     if local.returncode != 0:
         raise ValueError(local.stderr.strip() or "Não foi possível iniciar a faixa no daemon local")
 

@@ -49,12 +49,41 @@ FocusScope {
         if (mode === "search") mode = "library"
         view.forceActiveFocus()
     }
+    // Sticky: keep the controlled player while it exists (pausing must not hand control to
+    // Spotify); switch only when another player starts playing or Tab picks one.
+    // playerctld (for the media keys) registers as a proxy player mirroring the last active one; skip it.
+    readonly property var players: Mpris.players.values.filter(function(p) { return p.dbusName !== "org.mpris.MediaPlayer2.playerctld" })
     function refreshPlayer() {
-        var players = Mpris.players.values
-        view.player = players.find(function(p) { return p.isPlaying }) || players.find(function(p) { return p.trackTitle }) || null
+        var players = view.players
+        var current = view.player && players.indexOf(view.player) >= 0 ? view.player : null
+        if (current && (current.isPlaying || view.pinned)) return
+        view.player = players.find(function(p) { return p.isPlaying }) || current || players.find(function(p) { return p.trackTitle }) || null
     }
     Timer { interval: 500; running: true; repeat: true; onTriggered: view.refreshPlayer() }
     Timer { id: searchDelay; interval: 250; onTriggered: if (view.query.trim()) { searchProcess.command = ["python3", Quickshell.shellPath("spotify_bridge.py"), "search", view.query.trim()]; searchProcess.running = true } }
+    // A Tab choice sticks until the page closes, even if another player is the one playing.
+    property bool pinned: false
+    function cyclePlayer() {
+        var players = view.players.filter(function(p) { return p.trackTitle })
+        if (players.length) { view.player = players[(players.indexOf(view.player) + 1) % players.length]; view.pinned = true }
+    }
+    // Spotify keeps the bridge data (playlists, synced position); any other player shows its own MPRIS metadata.
+    readonly property bool isSpotify: !player || player.dbusName === "org.mpris.MediaPlayer2.spotify_player"
+    readonly property bool nowPlaying: isSpotify ? media.playing : player.isPlaying
+    readonly property string nowTitle: isSpotify ? media.title : player.trackTitle
+    readonly property string nowInfo: isSpotify ? (media.artist ? media.artist + (media.album ? " · " + media.album : "") : "") : [player.trackArtist, player.trackAlbum].filter(function(x) { return x }).join(" · ")
+    readonly property string nowArt: isSpotify ? media.art : player.trackArtUrl
+    readonly property real nowDuration: isSpotify ? media.duration : player.lengthSupported ? player.length * 1000 : 0
+    property int tick: 0
+    Timer { interval: 1000; repeat: true; running: !view.isSpotify && view.nowPlaying; onTriggered: { view.player.positionChanged(); view.tick++ } }
+    function nowPosition() { tick; return isSpotify ? media.currentPosition() : player.position * 1000 }
+    // ← → skip tracks; players without tracks (browser videos) seek 10 s instead.
+    function skip(direction) {
+        if (!player) return
+        if (direction > 0 && player.canGoNext) player.next()
+        else if (direction < 0 && player.canGoPrevious) player.previous()
+        else if (player.canSeek) player.seek(direction * 10)
+    }
     function search() { results = []; error = ""; searchDelay.restart() }
     function loadLibrary() {
         mode = "library"; selected = 0; error = ""
@@ -74,6 +103,7 @@ FocusScope {
         playProcess.running = true
     }
     function seekAt(fraction) {
+        if (!isSpotify) { if (player.canSeek && nowDuration > 0) player.position = Math.max(0, Math.min(1, fraction)) * player.length; return }
         if (media.duration <= 0 || seekProcess.running) return
         seekProcess.command = ["python3", Quickshell.shellPath("spotify_bridge.py"), "seek", String(Math.round(Math.max(0, Math.min(1, fraction)) * media.duration))]
         seekProcess.running = true
@@ -157,8 +187,9 @@ FocusScope {
         else if (event.key === Qt.Key_Backspace && mode === "playlist") { loadLibrary(); event.accepted = true }
         else if (event.key === Qt.Key_Backspace) back()
         else if (event.key === Qt.Key_Space && player && player.canTogglePlaying) player.togglePlaying()
-        else if (event.key === Qt.Key_Right && player && player.canGoNext) player.next()
-        else if (event.key === Qt.Key_Left && player && player.canGoPrevious) player.previous()
+        else if (event.key === Qt.Key_Right) skip(1)
+        else if (event.key === Qt.Key_Left) skip(-1)
+        else if (event.key === Qt.Key_Tab) { cyclePlayer(); event.accepted = true }
         else if (event.key === Qt.Key_Q) closeRequested()
         else if (event.key === Qt.Key_Down) { var count = mode === "library" ? playlists.length : mode === "playlist" ? tracks.length : mode === "queue" ? queueItems.length : mode === "recent" ? recentItems.length : results.length; selected = Math.min(Math.max(0, count - 1), selected + 1); event.accepted = true }
         else if (event.key === Qt.Key_Up) { selected = Math.max(0, selected - 1); event.accepted = true }
@@ -171,9 +202,9 @@ FocusScope {
         spacing: 16
         RowLayout {
             Layout.fillWidth: true
-            Text { text: "Music"; color: theme.foreground; font.pixelSize: 20 }
+            Text { text: "Media"; color: theme.foreground; font.pixelSize: 20 }
             Item { Layout.fillWidth: true }
-            Text { text: player ? player.identity : "No player"; color: theme.foreground; opacity: 0.55; font.pixelSize: 12 }
+            Text { text: (player ? player.identity : "No player") + (view.players.filter(function(p) { return p.trackTitle }).length > 1 ? "  ·  Tab switch" : ""); color: theme.foreground; opacity: 0.55; font.pixelSize: 12 }
         }
         Rectangle {
             visible: view.searchVisible
@@ -190,6 +221,8 @@ FocusScope {
         RowLayout {
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: 14
             ColumnLayout {
+                // Playlists and search are Spotify's; a browser video only needs the player panel.
+                visible: view.isSpotify
                 Layout.fillWidth: true; Layout.fillHeight: true; spacing: 8
                 Text { text: view.mode === "library" ? "Your playlists" : view.mode === "playlist" ? "Tracks · " + playlistTitle : view.mode === "queue" ? "Up next" : view.mode === "recent" ? "Recently played" : "Search results"; color: theme.foreground; font.pixelSize: 16 }
                 Rectangle {
@@ -223,19 +256,19 @@ FocusScope {
                 }
             }
             Rectangle {
-                Layout.preferredWidth: 270; Layout.fillHeight: true; radius: 10
+                Layout.preferredWidth: 270; Layout.fillWidth: !view.isSpotify; Layout.fillHeight: true; radius: 10
                 color: Qt.alpha(theme.foreground, 0.035); border.color: Qt.alpha(theme.foreground, 0.12)
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 14; spacing: 7
                     Text { text: "Now playing"; color: theme.foreground; opacity: 0.55; font.pixelSize: 11 }
                     Image {
-                        visible: !!view.media.art
-                        source: view.media.art
+                        visible: !!view.nowArt
+                        source: view.nowArt
                         sourceSize.width: 420; sourceSize.height: 420
                         Layout.fillWidth: true; Layout.preferredHeight: view.searchVisible ? 170 : (view.showButtons ? 215 : 230)
                         fillMode: Image.PreserveAspectFit; asynchronous: true
                     }
-                    Rectangle { visible: !view.media.art; Layout.fillWidth: true; Layout.preferredHeight: view.searchVisible ? 170 : (view.showButtons ? 215 : 230); color: Qt.alpha(theme.foreground, 0.06); radius: 6
+                    Rectangle { visible: !view.nowArt; Layout.fillWidth: true; Layout.preferredHeight: view.searchVisible ? 170 : (view.showButtons ? 215 : 230); color: Qt.alpha(theme.foreground, 0.06); radius: 6
                         Text { anchors.centerIn: parent; text: "♪"; color: theme.foreground; opacity: 0.35; font.pixelSize: 42 }
                     }
                     RowLayout {
@@ -246,29 +279,29 @@ FocusScope {
                         DashButton { Layout.fillWidth: true; theme: view.theme; text: "Queue"; hint: "U"; focusPolicy: Qt.NoFocus; onClicked: view.loadQueue() }
                         DashButton { Layout.fillWidth: true; theme: view.theme; text: "Recent"; hint: "R"; focusPolicy: Qt.NoFocus; onClicked: view.loadRecent() }
                     }
-                    Text { Layout.fillWidth: true; text: view.media.title || "Nothing playing"; textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; font.pixelSize: 16 }
-                    Text { Layout.fillWidth: true; text: view.media.artist ? view.media.artist + (view.media.album ? " · " + view.media.album : "") : "Open a playlist to start"; textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; opacity: 0.65; font.pixelSize: 12 }
+                    Text { Layout.fillWidth: true; text: view.nowTitle || "Nothing playing"; textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; font.pixelSize: 16 }
+                    Text { Layout.fillWidth: true; text: view.nowInfo || (view.isSpotify ? "Open a playlist to start" : ""); textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; opacity: 0.65; font.pixelSize: 12 }
                     RowLayout {
                         Layout.fillWidth: true; spacing: 8
-                        Text { text: view.media.formatTime(view.media.currentPosition()); color: theme.foreground; opacity: 0.55; font.pixelSize: 10; font.family: "monospace" }
+                        Text { text: view.media.formatTime(view.nowPosition()); color: theme.foreground; opacity: 0.55; font.pixelSize: 10; font.family: "monospace" }
                         Rectangle {
                             Layout.fillWidth: true; height: 5; radius: 3
                             color: Qt.alpha(theme.foreground, 0.13)
                             Rectangle {
-                                width: parent.width * (view.media.duration > 0 ? Math.min(1, view.media.currentPosition() / view.media.duration) : 0)
+                                width: parent.width * (view.nowDuration > 0 ? Math.min(1, view.nowPosition() / view.nowDuration) : 0)
                                 height: parent.height; radius: 3; color: theme.accent
                             }
                             MouseArea { anchors.fill: parent; onClicked: view.seekAt(mouse.x / width) }
                         }
-                        Text { text: view.media.formatTime(view.media.duration); color: theme.foreground; opacity: 0.55; font.pixelSize: 10; font.family: "monospace" }
+                        Text { text: view.nowDuration > 0 ? view.media.formatTime(view.nowDuration) : "live"; color: theme.foreground; opacity: 0.55; font.pixelSize: 10; font.family: "monospace" }
                     }
                     Item { Layout.fillHeight: true }
                     GridLayout {
                         Layout.fillWidth: true; columns: 2; columnSpacing: 6; rowSpacing: 6
-                        DashButton { Layout.fillWidth: true; theme: view.theme; text: "Previous"; hint: "←"; enabled: !!view.player && view.player.canGoPrevious; focusPolicy: Qt.NoFocus; onClicked: view.player.previous() }
-                        DashButton { Layout.fillWidth: true; theme: view.theme; text: view.media.playing ? "Pause" : "Play"; hint: "Space"; enabled: !!view.player && view.player.canTogglePlaying; focusPolicy: Qt.NoFocus; onClicked: view.player.togglePlaying() }
-                        DashButton { Layout.fillWidth: true; theme: view.theme; text: "Next"; hint: "→"; enabled: !!view.player && view.player.canGoNext; focusPolicy: Qt.NoFocus; onClicked: view.player.next() }
-                        DashButton { Layout.fillWidth: true; theme: view.theme; text: view.media.shuffle ? "Shuffle on" : "Shuffle"; hint: "s"; focusPolicy: Qt.NoFocus; onClicked: view.toggleShuffle() }
+                        DashButton { Layout.fillWidth: true; theme: view.theme; text: "Previous"; hint: "←"; enabled: !!view.player && (view.player.canGoPrevious || view.player.canSeek); focusPolicy: Qt.NoFocus; onClicked: view.skip(-1) }
+                        DashButton { Layout.fillWidth: true; theme: view.theme; text: view.nowPlaying ? "Pause" : "Play"; hint: "Space"; enabled: !!view.player && view.player.canTogglePlaying; focusPolicy: Qt.NoFocus; onClicked: view.player.togglePlaying() }
+                        DashButton { Layout.fillWidth: true; theme: view.theme; text: "Next"; hint: "→"; enabled: !!view.player && (view.player.canGoNext || view.player.canSeek); focusPolicy: Qt.NoFocus; onClicked: view.skip(1) }
+                        DashButton { visible: view.isSpotify; Layout.fillWidth: true; theme: view.theme; text: view.media.shuffle ? "Shuffle on" : "Shuffle"; hint: "s"; focusPolicy: Qt.NoFocus; onClicked: view.toggleShuffle() }
                     }
                 }
             }

@@ -30,7 +30,33 @@ Scope {
         var seconds = Math.max(0, Math.floor(value / 1000))
         return Math.floor(seconds / 60) + ":" + ("0" + (seconds % 60)).slice(-2)
     }
-    function refresh() { if (!current.running) current.running = true }
+    // Shared yerbad first (keeps the Web API connection open); Python bridge as fallback.
+    property QtObject yerbad: null
+    property bool daemonBusy: false
+    function refresh() {
+        if (daemonBusy || current.running) return
+        var asked = yerbad && yerbad.request("spotify.current", function(err, result) {
+            store.daemonBusy = false
+            store.apply(err ? {error: err} : result)
+        })
+        if (asked) daemonBusy = true
+        else current.running = true
+    }
+    function apply(data) {
+        store.error = data.error || ""
+        store.available = !!data.available
+        if (data.available) {
+            store.playing = !!data.playing
+            store.shuffle = !!data.shuffle
+            store.title = data.title || ""
+            store.artist = data.artist || ""
+            store.album = data.album || ""
+            store.art = data.art || ""
+            store.position = Number(data.position || 0)
+            store.duration = Number(data.duration || 0)
+            store.syncedAt = Date.now()
+        }
+    }
     // Spotify rate-limits frequent /me/player requests; 10s is enough for the
     // dashboard while avoiding 429 responses during normal navigation.
     Timer { interval: 10000; running: store.active; repeat: true; onTriggered: store.refresh() }
@@ -41,22 +67,7 @@ Scope {
         command: ["python3", Quickshell.shellPath("spotify_bridge.py"), "current"]
         stdout: StdioCollector {
             onStreamFinished: {
-                try {
-                    var data = JSON.parse(text)
-                    store.error = data.error || ""
-                    store.available = !!data.available
-                    if (data.available) {
-                        store.playing = !!data.playing
-                        store.shuffle = !!data.shuffle
-                        store.title = data.title || ""
-                        store.artist = data.artist || ""
-                        store.album = data.album || ""
-                        store.art = data.art || ""
-                        store.position = Number(data.position || 0)
-                        store.duration = Number(data.duration || 0)
-                        store.syncedAt = Date.now()
-                    }
-                } catch (e) { store.error = "Invalid Spotify state" }
+                try { store.apply(JSON.parse(text)) } catch (e) { store.error = "Invalid Spotify state" }
             }
         }
     }

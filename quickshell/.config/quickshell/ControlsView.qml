@@ -13,6 +13,16 @@ FocusScope {
     property int column: 0
     property var cursor: [0, 0, 0]
     property string message: ""
+    property bool messageError: false
+    // Bluetooth device or Wi-Fi network we asked to connect; cleared on success, failure or timeout.
+    property var pending: null
+    function watch(target, name) {
+        pending = target; messageError = false
+        message = "Connecting to " + name + "…"
+        connectTimeout.restart()
+    }
+    function fail(text) { pending = null; messageError = true; message = text; connectTimeout.stop() }
+    function busy(name) { messageError = false; message = name + " is busy, wait for it to finish"; }
     property var askPassword: null
     property var pairTarget: null
     signal back()
@@ -107,7 +117,7 @@ FocusScope {
     }
     function setVolume(node, value) {
         if (node && node.audio) {
-            var next = Math.max(0, Math.min(1, value)); node.audio.muted = false; node.audio.volume = next
+            var next = Math.max(0, Math.min(1.5, value)); node.audio.muted = false; node.audio.volume = next
             if (node.audio.volumes && node.audio.volumes.length) node.audio.volumes = node.audio.volumes.map(function() { return next })
         }
     }
@@ -124,16 +134,18 @@ FocusScope {
         case "bt-scan": adapter.discovering = !adapter.discovering; break
         case "bt-device":
             var d = item.device
+            if (d.pairing || d.state === BluetoothDeviceState.Connecting || d.state === BluetoothDeviceState.Disconnecting) { busy(d.name); break }
             if (d.connected) d.disconnect()
-            else if (d.paired) d.connect()
-            else { pairTarget = d; d.trusted = true; d.pair() }
+            else if (d.paired) { watch(d, d.name); d.connect() }
+            else { pairTarget = d; d.trusted = true; watch(d, d.name); d.pair() }
             break
         case "wifi-power": Networking.wifiEnabled = !Networking.wifiEnabled; break
         case "wired": if (item.device.connected) item.device.disconnect(); break
         case "wifi":
             var n = item.network
+            if (n.stateChanging) { busy(n.name); break }
             if (n.connected) n.disconnect()
-            else if (n.known || n.security === WifiSecurityType.Open) n.connect()
+            else if (n.known || n.security === WifiSecurityType.Open) { watch(n, n.name); n.connect() }
             else askPassword = n
             break
         }
@@ -169,9 +181,23 @@ FocusScope {
     }
     Connections {
         target: view.askPassword
-        function onConnectionFailed(reason) { view.message = "Connection failed: " + ConnectionFailReason.toString(reason) }
         function onConnectedChanged() { if (view.askPassword && view.askPassword.connected) { view.askPassword = null; view.forceActiveFocus() } }
     }
+    Connections {
+        target: view.pending
+        ignoreUnknownSignals: true
+        function onConnectedChanged() {
+            if (!view.pending || !view.pending.connected) return
+            view.message = "Connected to " + view.pending.name
+            view.pending = null
+            connectTimeout.stop()
+            clearMessage.restart()
+        }
+        // Wi-Fi only; Bluetooth has no failure signal, so it relies on the timeout.
+        function onConnectionFailed(reason) { view.fail("Connection failed: " + ConnectionFailReason.toString(reason) + " · Enter to retry") }
+    }
+    Timer { id: connectTimeout; interval: 20000; onTriggered: { if (view.pending) view.fail("Couldn't connect to " + view.pending.name + " · Enter to retry") } }
+    Timer { id: clearMessage; interval: 3000; onTriggered: { if (!view.pending && !view.messageError) view.message = "" } }
 
     ColumnLayout {
         anchors.fill: parent; spacing: 10
@@ -288,7 +314,7 @@ FocusScope {
                                     color: Qt.alpha(theme.foreground, 0.12)
                                     Rectangle {
                                         width: parent.width * (row.node && row.node.audio ? Math.min(1, view.nodeVolume(row.node)) : 0); height: parent.height; radius: 3
-                                        color: row.node && row.node.audio && row.node.audio.muted ? Qt.alpha(theme.foreground, 0.35) : theme.accent
+                                        color: row.node && row.node.audio && row.node.audio.muted ? Qt.alpha(theme.foreground, 0.35) : view.nodeVolume(row.node) > 1 ? theme.error : theme.accent
                                         Behavior on width { NumberAnimation { duration: 90 } }
                                     }
                                     MouseArea {
@@ -308,8 +334,8 @@ FocusScope {
                                         anchors.fill: parent; anchors.margins: 7
                                         echoMode: TextInput.Password; color: theme.foreground; font.pixelSize: 12; clip: true
                                         Text { visible: !parent.text; text: "Network password · Enter to connect"; color: theme.foreground; opacity: 0.5; font.pixelSize: 12 }
-                                        Keys.onReturnPressed: { if (text) { row.network.connectWithPsk(text); view.message = "Connecting to " + row.network.name + "…" } }
-                                        Keys.onEnterPressed: { if (text) { row.network.connectWithPsk(text); view.message = "Connecting to " + row.network.name + "…" } }
+                                        Keys.onReturnPressed: { if (text) { view.watch(row.network, row.network.name); row.network.connectWithPsk(text) } }
+                                        Keys.onEnterPressed: { if (text) { view.watch(row.network, row.network.name); row.network.connectWithPsk(text) } }
                                         Keys.onEscapePressed: { view.askPassword = null; view.forceActiveFocus() }
                                     }
                                 }
@@ -319,6 +345,14 @@ FocusScope {
                     Text {
                         visible: !list.count; Layout.fillWidth: true; wrapMode: Text.Wrap
                         text: card.modelData.empty; color: theme.foreground; opacity: 0.55; font.pixelSize: 12
+                    }
+                    Text {
+                        visible: view.message !== "" && card.index > 0
+                        Layout.fillWidth: true; wrapMode: Text.Wrap
+                        text: view.message
+                        color: view.messageError ? theme.error : theme.foreground
+                        opacity: view.messageError ? 1 : 0.7
+                        font.pixelSize: 12
                     }
                 }
             }

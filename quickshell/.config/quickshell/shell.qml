@@ -27,6 +27,9 @@ ShellRoot {
         property bool showIdleCard: true
         // Off-work suggestions: always, only outside work hours, or never.
         property string idleSuggestionsMode: "off-work"
+        // Dashboard layout: comma-separated card names. Empty order = sort by urgency.
+        property string cardOrder: ""
+        property string collapsedCards: ""
     }
     function toggleTopBar() {
         preferences.showTopBar = !preferences.showTopBar
@@ -207,18 +210,24 @@ ShellRoot {
             if (root.menuOpen && menu.route === "media") root.menuOpen = false
             else { menu.route = "media"; root.openMenu() }
         }
-        function open(route: string) { menu.route = route; root.openMenu() }
+        function open(route: string) { menu.navigate(route); root.openMenu() }
+        // From desktop-pass: field names (never values) of a decrypted entry.
+        // Names arrive tab-separated with "," and "%" percent-encoded (the CLI splits on commas).
+        function passFields(entry: string, names: string) { menu.showPassFields(decodeURIComponent(entry), names.split("\t").map(decodeURIComponent)); root.openMenu() }
         function morphTo(name: string) { root.morphToSpecial(name) }
         function switchSpecial(name: string) { root.switchSpecial(name) }
     }
 
-    Notifications { id: notificationService; theme: palette }
+    Notifications { id: notificationService; theme: palette; paused: lockScreen.locked || root.menuOpen }
+    Osd { theme: palette }
+    Meeting { id: meetingMode; notifications: notificationService }
     Clipboard { id: clipboardStore }
-    OrgStore { id: orgStore }
+    Yerbad { id: yerbadService }
+    OrgStore { id: orgStore; yerbad: yerbadService }
     // Spotify is visible only on the dashboard and Music page. Avoid polling
     // the Web API while the dock is closed or another route is active.
-    MediaStore { id: mediaStore; active: root.menuOpen && (menu.route === "main" || menu.route === "media") }
-    Feed { id: feedStore; theme: palette; org: orgStore; notifications: notificationService; media: mediaStore; preferences: preferences; open: root.menuOpen }
+    MediaStore { id: mediaStore; yerbad: yerbadService; active: root.menuOpen && (menu.route === "main" || menu.route === "media") }
+    Feed { id: feedStore; yerbad: yerbadService; theme: palette; org: orgStore; notifications: notificationService; media: mediaStore; preferences: preferences; open: root.menuOpen; boardsOpen: root.menuOpen && menu.route === "boards" }
     Bar {
         visible: preferences.showTopBar
         theme: palette
@@ -229,6 +238,8 @@ ShellRoot {
     Menu {
         id: menu
         org: orgStore
+        meeting: meetingMode
+        yerbad: yerbadService
         showTopBar: preferences.showTopBar
         buttonPreferences: preferences
         time: root.now

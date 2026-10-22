@@ -24,7 +24,29 @@ Scope {
         var seconds = Math.max(0, Math.floor(value || 0))
         return Math.floor(seconds / 60) + ":" + ("0" + (seconds % 60)).slice(-2)
     }
-    function refresh() { if (!reader.running) reader.running = true }
+    // Shared yerbad first (~4 ms); Python bridge as fallback.
+    property QtObject yerbad: null
+    property bool daemonBusy: false
+    function refresh() {
+        if (daemonBusy || reader.running) return
+        var asked = yerbad && yerbad.request("radiola.current", function(err, result) {
+            store.daemonBusy = false
+            store.apply(err ? {available: false} : result)
+        })
+        if (asked) daemonBusy = true
+        else reader.running = true
+    }
+    function apply(data) {
+        store.available = !!data.available
+        if (data.available) {
+            store.playing = !!data.playing
+            store.title = data.title || ""
+            store.feed = data.feed || "Podcast"
+            store.position = Number(data.position || 0)
+            store.duration = Number(data.duration || 0)
+            store.syncedAt = Date.now()
+        }
+    }
     function toggle() { action.command = ["python3", Quickshell.shellPath("radiola_bridge.py"), "toggle"]; action.running = true }
     function stop() { action.command = ["python3", Quickshell.shellPath("radiola_bridge.py"), "stop"]; action.running = true }
     function open() { Quickshell.execDetached(["radiola-ui"]) }
@@ -39,18 +61,7 @@ Scope {
         command: ["python3", Quickshell.shellPath("radiola_bridge.py"), "current"]
         stdout: StdioCollector {
             onStreamFinished: {
-                try {
-                    var data = JSON.parse(text)
-                    store.available = !!data.available
-                    if (data.available) {
-                        store.playing = !!data.playing
-                        store.title = data.title || ""
-                        store.feed = data.feed || "Podcast"
-                        store.position = Number(data.position || 0)
-                        store.duration = Number(data.duration || 0)
-                        store.syncedAt = Date.now()
-                    }
-                } catch (e) { store.available = false }
+                try { store.apply(JSON.parse(text)) } catch (e) { store.available = false }
             }
         }
     }

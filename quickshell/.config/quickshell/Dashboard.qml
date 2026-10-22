@@ -15,6 +15,14 @@ FocusScope {
     signal closeRequested()
     signal helpRequested()
     readonly property var cards: feed.cards
+    readonly property var collapsedNames: buttonPreferences.collapsedCards ? buttonPreferences.collapsedCards.split(",") : []
+    function isCollapsed(name) { return collapsedNames.indexOf(name) >= 0 }
+    function toggleCollapsed(name) {
+        var names = collapsedNames.filter(function(n) { return n !== name })
+        if (!isCollapsed(name)) names.push(name)
+        buttonPreferences.collapsedCards = names.join(",")
+        buttonPreferences.sync()
+    }
     readonly property bool showButtons: buttonPreferences.showButtons
     implicitHeight: layout.implicitHeight
     // Keyboard first, Gambito style: contextual card keys, then global dashboard keys.
@@ -90,10 +98,13 @@ FocusScope {
                 Repeater {
                     model: dashboard.cards.filter(function(card, index) { return index % 2 === 0 })
                     delegate: Loader {
+                        id: cardLoader
                         required property var modelData
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignTop
                         sourceComponent: modelData.view
+                        Binding { when: !!cardLoader.item; target: cardLoader.item; property: "collapsed"; value: dashboard.isCollapsed(cardLoader.modelData.name) }
+                        Connections { target: cardLoader.item; ignoreUnknownSignals: true; function onCollapseToggled() { dashboard.toggleCollapsed(cardLoader.modelData.name) } }
                     }
                 }
             }
@@ -106,10 +117,13 @@ FocusScope {
                 Repeater {
                     model: dashboard.cards.filter(function(card, index) { return index % 2 === 1 })
                     delegate: Loader {
+                        id: cardLoader
                         required property var modelData
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignTop
                         sourceComponent: modelData.view
+                        Binding { when: !!cardLoader.item; target: cardLoader.item; property: "collapsed"; value: dashboard.isCollapsed(cardLoader.modelData.name) }
+                        Connections { target: cardLoader.item; ignoreUnknownSignals: true; function onCollapseToggled() { dashboard.toggleCollapsed(cardLoader.modelData.name) } }
                     }
                 }
             }
@@ -123,7 +137,7 @@ FocusScope {
             DashButton { theme: dashboard.theme; text: "Agents"; hint: "t"; focusPolicy: Qt.NoFocus; onClicked: dashboard.navigate("tmux") }
             DashButton { theme: dashboard.theme; text: "Notes"; hint: "o"; focusPolicy: Qt.NoFocus; onClicked: dashboard.navigate("notes") }
             DashButton { theme: dashboard.theme; text: "Calendar"; hint: "C"; focusPolicy: Qt.NoFocus; onClicked: dashboard.navigate("calendar") }
-            DashButton { theme: dashboard.theme; text: "Music"; hint: "m"; focusPolicy: Qt.NoFocus; onClicked: dashboard.navigate("media") }
+            DashButton { theme: dashboard.theme; text: "Media"; hint: "m"; focusPolicy: Qt.NoFocus; onClicked: dashboard.navigate("media") }
             DashButton { theme: dashboard.theme; text: "Clipboard"; hint: "v"; focusPolicy: Qt.NoFocus; onClicked: dashboard.navigate("clipboard") }
             DashButton { theme: dashboard.theme; text: "Apps"; hint: "a"; focusPolicy: Qt.NoFocus; onClicked: dashboard.navigate("applications") }
             DashButton { theme: dashboard.theme; text: "Audio"; hint: "c"; focusPolicy: Qt.NoFocus; onClicked: dashboard.navigate("audio") }

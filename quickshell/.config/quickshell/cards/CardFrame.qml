@@ -8,6 +8,9 @@ Rectangle {
     property string title: ""
     property string hint: ""
     property bool urgent: false
+    // Set by the dashboard from preferences; collapsed shows only the header.
+    property bool collapsed: false
+    signal collapseToggled()
     default property alias content: body.data
     implicitHeight: column.implicitHeight + 24
     radius: 10
@@ -23,8 +26,14 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             Text { Layout.fillWidth: true; text: frame.title; color: frame.urgent ? theme.accent : theme.foreground; font.pixelSize: 13; elide: Text.ElideRight }
-            Text { visible: !!frame.hint; text: frame.hint; color: theme.foreground; opacity: 0.45; font.family: "monospace"; font.pixelSize: 11 }
+            Text { visible: !!frame.hint && !frame.collapsed; text: frame.hint; color: theme.foreground; opacity: 0.45; font.family: "monospace"; font.pixelSize: 11 }
+            Text {
+                text: frame.collapsed ? "▸" : "▾"
+                color: theme.foreground; opacity: chevronMouse.containsMouse ? 0.9 : 0.4; font.pixelSize: 12
+                // MouseArea (not TapHandler) so the click doesn't also reach the card's own TapHandler.
+                MouseArea { id: chevronMouse; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; onClicked: frame.collapseToggled() }
+            }
         }
-        ColumnLayout { id: body; Layout.fillWidth: true; spacing: 6 }
+        ColumnLayout { id: body; visible: !frame.collapsed; Layout.fillWidth: true; spacing: 6 }
     }
 }

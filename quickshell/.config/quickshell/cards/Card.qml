@@ -7,6 +7,8 @@ Scope {
     property QtObject theme
     // The Feed: exposes navigate(route), openTmux(item) and the shared stores.
     property QtObject feed
+    // Stable id for preferences (order, collapsed); titles change with content.
+    property string name: ""
     property bool active: false
     property int priority: 0
     property string title: ""

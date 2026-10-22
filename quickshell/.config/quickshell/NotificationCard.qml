@@ -11,6 +11,8 @@ Rectangle {
     property string icon: ""
     property bool critical: false
     property var actions: []
+    // Shown on the default ("Open") button when a global shortcut runs it.
+    property string keyHint: ""
     readonly property bool hovered: hover.hovered
     signal dismissRequested()
     signal actionRequested(int actionIndex)
@@ -74,9 +76,16 @@ Rectangle {
                 delegate: Rectangle {
                     required property var modelData
                     required property int index
-                    width: Math.min(actionText.implicitWidth + 18, content.width)
+                    readonly property string hint: modelData.identifier === "default" ? card.keyHint : ""
+                    width: Math.min(actionRow.implicitWidth + 18, content.width)
                     height: 28; radius: 4; color: theme.surface
-                    Text { id: actionText; anchors.centerIn: parent; width: Math.min(implicitWidth, parent.width - 18); text: modelData.text; textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; font.pixelSize: 12 }
+                    Row {
+                        id: actionRow
+                        anchors.centerIn: parent
+                        spacing: 8
+                        Text { width: Math.min(implicitWidth, content.width - 18); text: modelData.text; textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; font.pixelSize: 12 }
+                        Text { visible: text !== ""; text: parent.parent.hint; textFormat: Text.PlainText; color: theme.foreground; opacity: 0.55; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
+                    }
                     MouseArea { anchors.fill: parent; onClicked: card.actionRequested(index) }
                 }
             }

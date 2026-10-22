@@ -71,7 +71,7 @@ PanelWindow {
                     ["Space", "Dock"],
                     ["C", "Tmux"],
                     ["Shift + O", "Daily note"],
-                    ["Shift + M", "Music"],
+                    ["Shift + M", "Media"],
                     ["H", "Key reference"],
                     ["B", "Browser"]
                 ]

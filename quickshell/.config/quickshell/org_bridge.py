@@ -108,11 +108,43 @@ def search(query, index=None):
                     break
     return [r for _, r in sorted(found, key=lambda x: (x[0], fold(x[1]['title'])))[:40]]
 
+def recent_paths():
+    """Same files and filters as documents(), newest first, from stat alone (no reads)."""
+    if not ROOT.is_dir():
+        raise ValueError('Org vault not found')
+    found = []
+    for base, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if not d.startswith('.') and not Path(base, d).is_symlink()]
+        for name in files:
+            path = Path(base, name)
+            if not name.endswith('.org') or path.is_symlink():
+                continue
+            try:
+                info = path.stat()
+            except OSError:
+                continue
+            if info.st_size <= 2_000_000:
+                found.append((info.st_mtime, path))
+    return sorted(found, key=lambda x: x[0], reverse=True)
+
 def home():
+    # The dock shows 3 recent notes and today's tasks: read only those files, not the whole vault.
     today = today_path()
     recent = []
     tasks = []
-    for path, body, mtime in documents():
+    wanted = []
+    for mtime, path in recent_paths():
+        if len(wanted) >= 3 and path != today:
+            continue
+        try:
+            body = path.read_text(encoding='utf-8')
+        except (OSError, UnicodeError):
+            continue
+        if len(wanted) < 3:
+            wanted.append((path, body, mtime))
+        elif path == today:
+            wanted.append((path, body, mtime))
+    for path, body, mtime in wanted:
         title = next((s.split(':', 1)[1].strip() for s in body.splitlines() if s.lower().startswith('#+title:')), path.stem)
         item = row(path, title, 1, str(path.relative_to(ROOT)))
         preview = [line for line in body.splitlines() if line.strip() and not line.startswith('#+')][:14]
