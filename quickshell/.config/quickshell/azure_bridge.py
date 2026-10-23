@@ -11,6 +11,8 @@ import time
 
 CACHE = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "yerba" / "azure-boards.json"
 MAX_AGE = 300
+# Org/project stay out of this public repo: set in ~/.config/environment.d (private).
+BOARDS_URL = os.environ.get("AZURE_BOARDS_URL", "").rstrip("/")
 ITEM_RE = re.compile(r"^\s*\[(\d+)\]\s+([^|]+)\|\s*([^|]+)\|\s*(.*?)\s*$")
 
 
@@ -29,7 +31,7 @@ def parse(text):
             "subtitle": f"{kind.strip()} · {state.strip()}",
             "state": state.strip(),
             "assigned": assigned.strip(),
-            "url": f"https://dev.azure.com/ORG/PROJECT/_workitems/edit/{item_id}",
+            "url": f"{BOARDS_URL}/_workitems/edit/{item_id}" if BOARDS_URL else "",
         })
     return rows
 
