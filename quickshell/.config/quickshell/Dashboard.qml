@@ -86,45 +86,60 @@ FocusScope {
             text: feed.org.error
             color: theme.accent; opacity: 0.85; font.pixelSize: 13
         }
-        RowLayout {
+        // Masonry: each card goes to whichever column is shorter, so one side never overflows the capped dock.
+        Item {
+            id: masonry
             visible: dashboard.cards.length > 0
             Layout.fillWidth: true
-            spacing: 14
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.preferredWidth: 1
-                Layout.alignment: Qt.AlignTop
-                spacing: 14
-                Repeater {
-                    model: dashboard.cards.filter(function(card, index) { return index % 2 === 0 })
-                    delegate: Loader {
-                        id: cardLoader
-                        required property var modelData
-                        Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignTop
-                        sourceComponent: modelData.view
-                        Binding { when: !!cardLoader.item; target: cardLoader.item; property: "collapsed"; value: dashboard.isCollapsed(cardLoader.modelData.name) }
-                        Connections { target: cardLoader.item; ignoreUnknownSignals: true; function onCollapseToggled() { dashboard.toggleCollapsed(cardLoader.modelData.name) } }
-                    }
-                }
+            readonly property real columnWidth: dashboard.cards.length > 1 ? (width - 14) / 2 : width
+            function relayout() {
+                // A card fading out keeps its slot; the rest move once it is gone.
+                for (var i = 0; i < cardRepeater.count; i++) if (cardRepeater.itemAt(i) && cardRepeater.itemAt(i).leaving) return
+                var heights = [0, 0]
+                dashboard.cards.forEach(function(card) {
+                    var loader = cardRepeater.itemAt(feed.all.indexOf(card))
+                    if (!loader || !loader.item) return
+                    var column = heights[1] < heights[0] ? 1 : 0
+                    // First placement is instant (placed is still false); later moves slide.
+                    loader.x = column * (columnWidth + 14); loader.y = heights[column]
+                    loader.placed = true
+                    heights[column] += loader.height + 14
+                })
+                implicitHeight = Math.max(0, Math.max(heights[0], heights[1]) - 14)
             }
-            ColumnLayout {
-                visible: dashboard.cards.length > 1
-                Layout.fillWidth: true
-                Layout.preferredWidth: 1
-                Layout.alignment: Qt.AlignTop
-                spacing: 14
-                Repeater {
-                    model: dashboard.cards.filter(function(card, index) { return index % 2 === 1 })
-                    delegate: Loader {
-                        id: cardLoader
-                        required property var modelData
-                        Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignTop
-                        sourceComponent: modelData.view
-                        Binding { when: !!cardLoader.item; target: cardLoader.item; property: "collapsed"; value: dashboard.isCollapsed(cardLoader.modelData.name) }
-                        Connections { target: cardLoader.item; ignoreUnknownSignals: true; function onCollapseToggled() { dashboard.toggleCollapsed(cardLoader.modelData.name) } }
+            onWidthChanged: Qt.callLater(relayout)
+            Connections { target: dashboard; function onCardsChanged() { Qt.callLater(masonry.relayout) } }
+            // One delegate per card provider, kept alive across list changes: an array model would
+            // rebuild every card whenever one appears, disappears or changes priority.
+            Repeater {
+                id: cardRepeater
+                model: feed.all
+                delegate: Loader {
+                    id: cardLoader
+                    required property var modelData
+                    property bool placed: false
+                    property bool leaving: false
+                    active: modelData.active || leaving
+                    visible: active && placed
+                    opacity: modelData.active && placed ? 1 : 0
+                    width: masonry.columnWidth
+                    sourceComponent: modelData.view
+                    Behavior on x { enabled: cardLoader.placed; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    Behavior on y { enabled: cardLoader.placed; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Connections {
+                        target: cardLoader.modelData
+                        function onActiveChanged() {
+                            if (!cardLoader.modelData.active && cardLoader.placed) { cardLoader.leaving = true; leaveTimer.restart(); return }
+                            leaveTimer.stop(); cardLoader.leaving = false
+                            Qt.callLater(masonry.relayout)
+                        }
                     }
+                    Timer { id: leaveTimer; interval: 180; onTriggered: { cardLoader.leaving = false; cardLoader.placed = false; Qt.callLater(masonry.relayout) } }
+                    onLoaded: Qt.callLater(masonry.relayout)
+                    onHeightChanged: Qt.callLater(masonry.relayout)
+                    Binding { when: !!cardLoader.item; target: cardLoader.item; property: "collapsed"; value: dashboard.isCollapsed(cardLoader.modelData.name) }
+                    Connections { target: cardLoader.item; ignoreUnknownSignals: true; function onCollapseToggled() { dashboard.toggleCollapsed(cardLoader.modelData.name) } }
                 }
             }
         }
