@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""
+Esports calendar sync — Dota 2 (Tier 1) and CS2 (S-Tier, $500k+).
+Hardcoded annual events; tries Liquipedia MediaWiki API for future updates.
+"""
+
+import json
+import re
+from datetime import date, datetime
+from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError
+
+OUTPUT_DIR = Path.home() / ".local/share/khal/calendars/sports_esports"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+    "Accept": "application/json",
+}
+YEAR = datetime.now().year
+
+# Tier 1 Dota 2 + S-Tier CS2 ($500k+) for known years
+# Update each January after Liquipedia fills in the schedule
+EVENTS = {
+    "dota2": {
+        2026: [
+            ("🎮 Esports World Cup 2026 — Dota 2",   date(2026,  7,  7), date(2026,  7, 19), "Paris, France. $2,000,000"),
+            ("🎮 Games of the Future 2026",            date(2026,  7, 31), date(2026,  8,  5), "Astana, Kazakhstan. $1,000,000"),
+            ("🎮 The International 2026",              date(2026,  8, 13), date(2026,  8, 23), "Shanghai, China. $1,600,000"),
+            ("🎮 PGL Wallachia Season 9",              date(2026,  9, 17), date(2026,  9, 27), "Bucharest, Romania. $1,000,000"),
+            ("🎮 BLAST SLAM VIII",                     date(2026,  9, 29), date(2026, 10, 11), "$1,000,000"),
+            ("🎮 Esports Nations Cup 2026",            date(2026, 11,  2), date(2026, 11,  8), "Riyadh, Saudi Arabia. $1,864,000"),
+            ("🎮 BLAST SLAM IX",                       date(2026, 11, 17), date(2026, 11, 29), "$1,000,000"),
+        ],
+    },
+    "cs2": {
+        2026: [
+            ("🔫 BLAST Bounty Winter 2026",            date(2026,  1, 22), date(2026,  1, 25), "Malta. $452,500"),
+            ("🔫 IEM Kraków 2026",                     date(2026,  1, 28), date(2026,  2,  8), "Kraków, Poland. $1,000,000"),
+            ("🔫 PGL Cluj-Napoca 2026",                date(2026,  2, 14), date(2026,  2, 22), "Cluj-Napoca, Romania. $625,000"),
+            ("🔫 ESL Pro League Season 23",            date(2026,  3, 13), date(2026,  3, 15), "Sweden. $275,000"),
+            ("🔫 BLAST Open Spring 2026",              date(2026,  3, 18), date(2026,  3, 29), "Netherlands/Denmark. $400,000"),
+            ("🔫 IEM Rio 2026",                        date(2026,  4, 13), date(2026,  4, 19), "Rio de Janeiro, Brazil. $300,000"),
+            ("🔫 BLAST Rivals Spring 2026",            date(2026,  4, 29), date(2026,  5,  3), "USA. $350,000"),
+            ("🔫 PGL Astana 2026",                     date(2026,  5,  9), date(2026,  5, 17), "Astana, Kazakhstan. $800,000"),
+            ("🔫 IEM Atlanta 2026",                    date(2026,  5, 11), date(2026,  5, 17), "Atlanta, USA. $300,000"),
+            ("🔫 CS Asia Championships 2026",          date(2026,  5, 20), date(2026,  5, 24), "China. $400,000"),
+            ("🔫 IEM Cologne Major 2026",              date(2026,  6,  2), date(2026,  6, 21), "Cologne, Germany. $1,250,000 — Major"),
+            ("🔫 BLAST Bounty Summer 2026",            date(2026,  7, 30), date(2026,  8,  2), "Malta."),
+            ("🔫 Esports World Cup 2026 — CS2",        date(2026,  8, 12), date(2026,  8, 23), "Paris, France. $2,000,000"),
+            ("🔫 BLAST Open Fall 2026",                date(2026,  8, 26), date(2026,  9,  6), "Portugal/Denmark. $400,000"),
+            ("🔫 FISSURE Playground #5",               date(2026,  9,  7), date(2026,  9, 13), "China. $450,000"),
+            ("🔫 StarLadder StarSeries Fall 2026",     date(2026,  9, 17), date(2026,  9, 20), "Europe. $250,000"),
+            ("🔫 ESL Pro League Season 24",            date(2026, 10,  3), date(2026, 10, 11), "Poland. $300,000"),
+            ("🔫 Thunderpick World Championship 2026", date(2026, 10, 14), date(2026, 10, 18), "Malta. $500,000"),
+            ("🔫 PGL Masters Bucharest 2026",          date(2026, 10, 24), date(2026, 10, 31), "Bucharest, Romania. $625,000"),
+            ("🔫 IEM Beijing 2026",                    date(2026, 11,  2), date(2026, 11,  8), "China. $300,000"),
+            ("🔫 BLAST Rivals Fall 2026",              date(2026, 11, 11), date(2026, 11, 15), "Hong Kong. $350,000"),
+            ("🔫 PGL Major Singapore 2026",            date(2026, 11, 25), date(2026, 12, 13), "Singapore. $1,250,000 — Major"),
+        ],
+    },
+}
+
+
+def fetch_liquipedia(game: str) -> str | None:
+    """Try MediaWiki API — returns HTML text or None on failure."""
+    url = (
+        f"https://liquipedia.net/{game}/api.php"
+        f"?action=parse&page=Portal:Tournaments&prop=text&format=json"
+    )
+    try:
+        req = Request(url, headers=HEADERS)
+        with urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode())
+            return data.get("parse", {}).get("text", {}).get("*", "")
+    except Exception:
+        return None
+
+
+def parse_liquipedia_tournaments(html: str) -> list[tuple]:
+    """Extract (name, start, end, desc) from Liquipedia portal HTML."""
+    events = []
+    # Match rows in tournament tables: date range + name + prizepool
+    for m in re.finditer(
+        r'(\d{4}-\d{2}-\d{2})\s*[–\-]\s*(\d{4}-\d{2}-\d{2}).*?'
+        r'title="([^"]+)"[^>]*>.*?\$\s*([\d,]+)',
+        html, re.DOTALL
+    ):
+        try:
+            start = date.fromisoformat(m.group(1))
+            end   = date.fromisoformat(m.group(2))
+            name  = m.group(3).strip()
+            prize = int(m.group(4).replace(",", ""))
+            if prize >= 500_000:
+                events.append((name, start, end, f"${prize:,}"))
+        except (ValueError, AttributeError):
+            continue
+    return events
+
+
+def write_ics(uid: str, summary: str, start: date, end: date, description: str) -> None:
+    from datetime import timedelta
+    end_excl = end + timedelta(days=1)
+    path = OUTPUT_DIR / f"{uid}.ics"
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//esports-cal-sync//EN",
+        "BEGIN:VEVENT",
+        f"UID:{uid}",
+        f"SUMMARY:{summary}",
+        f"DTSTART;VALUE=DATE:{start.strftime('%Y%m%d')}",
+        f"DTEND;VALUE=DATE:{end_excl.strftime('%Y%m%d')}",
+        f"DESCRIPTION:{description}",
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ]
+    path.write_text("\n".join(lines))
+    print(f"  {path.name}: {start} → {end}  {summary}")
+
+
+def make_uid(game: str, name: str, start: date) -> str:
+    import hashlib
+    key = f"{game}-{name}-{start}"
+    return hashlib.md5(key.encode()).hexdigest() + f"@{game}"
+
+
+def sync_game(game: str, emoji_prefix: str) -> None:
+    print(f"{game.upper()}...")
+    written = set()
+
+    # Try live Liquipedia data first
+    html = fetch_liquipedia(game)
+    if html:
+        live = parse_liquipedia_tournaments(html)
+        if live:
+            for name, start, end, desc in live:
+                uid = make_uid(game, name, start)
+                write_ics(uid, f"{emoji_prefix} {name}", start, end, desc)
+                written.add(uid)
+
+    # Fill in hardcoded events not covered by live data
+    for summary, start, end, desc in EVENTS.get(game, {}).get(YEAR, []):
+        uid = make_uid(game, summary, start)
+        if uid not in written:
+            write_ics(uid, summary, start, end, desc)
+            written.add(uid)
+
+    if not html or not live:
+        print(f"{game}: live source unavailable; using hardcoded events")
+        return True
+
+    # Clean up stale files for this game
+    for f in OUTPUT_DIR.glob(f"*@{game}.ics"):
+        if f.stem not in written:
+            f.unlink()
+    return True
+
+
+if __name__ == "__main__":
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    results = [sync_game("dota2", "🎮"), sync_game("cs2", "🔫")]
+    print("esports-cal-sync done.")
+    raise SystemExit(0 if all(results) else 1)

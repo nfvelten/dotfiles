@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""
+Syncs annual sports events (WSOP, MLB World Series, Dakar) from web sources.
+Updates ICS files in the khal sports calendar.
+Sources: Wikipedia (WSOP/MLB), timeout-racing.com (Dakar).
+"""
+
+import json
+import re
+import sys
+from datetime import datetime, date
+from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError
+
+CALENDAR_DIR = Path.home() / ".local/share/khal/calendars/sports"
+HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+YEAR = datetime.now().year
+
+
+def fetch(url: str) -> str:
+    req = Request(url, headers=HEADERS)
+    with urlopen(req, timeout=15) as r:
+        return r.read().decode("utf-8", errors="replace")
+
+
+def write_ics(uid: str, summary: str, start: date, end: date, description: str = "") -> None:
+    path = CALENDAR_DIR / f"{uid}.ics"
+    # DTEND in ICS all-day is exclusive (day after last day)
+    end_excl = date(end.year, end.month, end.day + 1) if end.day < 28 else \
+        date(end.year + (1 if end.month == 12 else 0),
+             1 if end.month == 12 else end.month + 1, 1)
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//sports-annual-sync//EN",
+        "BEGIN:VEVENT",
+        f"UID:{uid}",
+        f"SUMMARY:{summary}",
+        f"DTSTART;VALUE=DATE:{start.strftime('%Y%m%d')}",
+        f"DTEND;VALUE=DATE:{end_excl.strftime('%Y%m%d')}",
+    ]
+    if description:
+        lines.append(f"DESCRIPTION:{description}")
+    lines += ["END:VEVENT", "END:VCALENDAR"]
+    path.write_text("\n".join(lines))
+    print(f"  wrote {path.name}: {start} → {end}")
+
+
+def parse_month_range(text: str, year: int) -> tuple[date, date] | None:
+    """Parse 'May 26 – July 15' or 'October 23 – 31' into (start, end) dates."""
+    months = {
+        "january": 1, "february": 2, "march": 3, "april": 4,
+        "may": 5, "june": 6, "july": 7, "august": 8,
+        "september": 9, "october": 10, "november": 11, "december": 12,
+    }
+    text = text.strip()
+
+    # Pattern: "Month DD – Month DD" or "Month DD – DD"
+    m = re.match(
+        r"(\w+)\s+(\d+)\s*[–\-]\s*(?:(\w+)\s+)?(\d+)",
+        text, re.I
+    )
+    if not m:
+        return None
+
+    start_mon_str, start_day, end_mon_str, end_day = m.groups()
+    start_mon = months.get(start_mon_str.lower())
+    end_mon = months.get((end_mon_str or start_mon_str).lower())
+    if not start_mon or not end_mon:
+        return None
+
+    try:
+        return date(year, start_mon, int(start_day)), date(year, end_mon, int(end_day))
+    except ValueError:
+        return None
+
+
+# ── WSOP ─────────────────────────────────────────────────────────────────────
+
+def sync_wsop() -> None:
+    print("WSOP...")
+    url = f"https://en.wikipedia.org/wiki/{YEAR}_World_Series_of_Poker"
+    try:
+        html = fetch(url)
+    except URLError as e:
+        print(f"  WARN: {e}")
+        return
+
+    title = re.search(r"<title>(.*?)</title>", html)
+    if title and "World Series of Poker" not in title.group(1):
+        print(f"  SKIP: Wikipedia page not found (got: {title.group(1)[:60]})")
+        return
+
+    m = re.search(
+        r'infobox-label">\s*Dates\s*</th><td[^>]*>([^<]+)</td>',
+        html, re.I
+    )
+    if not m:
+        print("  WARN: dates not found in infobox")
+        return
+
+    dates_text = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+    parsed = parse_month_range(dates_text, YEAR)
+    if not parsed:
+        print(f"  WARN: could not parse '{dates_text}'")
+        return
+
+    start, end = parsed
+    # Main Event is always first Thu of July — approximate if unknown
+    main_event_m = re.search(r"Main Event.*?(July|June)\s+(\d+)", html, re.I)
+    me_note = ""
+    if main_event_m:
+        me_day = int(main_event_m.group(2))
+        me_mon = 7 if "july" in main_event_m.group(1).lower() else 6
+        me_note = f"Main Event: {YEAR}-{me_mon:02d}-{me_day:02d}. "
+
+    write_ics(
+        uid="wsop@sports",
+        summary=f"🃏 WSOP {YEAR}",
+        start=start,
+        end=end,
+        description=f"{me_note}World Series of Poker {YEAR}. Las Vegas.",
+    )
+
+
+# ── MLB World Series ──────────────────────────────────────────────────────────
+
+MLB_PLAYOFFS_FALLBACK = {
+    # (wild_card, div_series, champ_series, world_series) — approximate dates
+    2026: [
+        ("mlb-wild-card@sports",       f"⚾ MLB Wild Card Series 2026",       date(2026, 10,  1), date(2026, 10,  3), "Wild Card Series 2026. Best of 3."),
+        ("mlb-division-series@sports", f"⚾ MLB Division Series 2026",        date(2026, 10,  7), date(2026, 10, 13), "ALDS + NLDS 2026. Best of 5."),
+        ("mlb-champ-series@sports",    f"⚾ MLB Championship Series 2026",    date(2026, 10, 15), date(2026, 10, 21), "ALCS + NLCS 2026. Best of 7."),
+        ("mlb-world-series@sports",    f"⚾ MLB World Series 2026",           date(2026, 10, 23), date(2026, 10, 31), "World Series 2026. Best of 7."),
+    ],
+}
+
+
+def sync_mlb() -> None:
+    print("MLB Playoffs...")
+    # Write fallback playoff rounds unconditionally (Wikipedia articles don't exist until after the fact)
+    rounds = MLB_PLAYOFFS_FALLBACK.get(YEAR, [])
+    for uid, summary, start, end, desc in rounds:
+        write_ics(uid=uid, summary=summary, start=start, end=end, description=desc)
+
+    # Try to refine World Series dates from Wikipedia if article exists
+    url = f"https://en.wikipedia.org/wiki/{YEAR}_World_Series"
+    try:
+        html = fetch(url)
+    except URLError as e:
+        print(f"  WARN Wikipedia: {e}")
+        return
+
+    title = re.search(r"<title>(.*?)</title>", html)
+    if not title or f"{YEAR}" not in title.group(1):
+        return
+
+    m = re.search(r"(\w+ \d+)[^<]*–[^<]*(\w+ \d+),?\s*" + str(YEAR), html)
+    parsed = parse_month_range(f"{m.group(1)} – {m.group(2)}", YEAR) if m else None
+    if parsed:
+        start, end = parsed
+        write_ics(
+            uid="mlb-world-series@sports",
+            summary=f"⚾ MLB World Series {YEAR}",
+            start=start, end=end,
+            description=f"World Series {YEAR}. Best of 7.",
+        )
+
+
+# ── Dakar Rally ───────────────────────────────────────────────────────────────
+
+def sync_dakar() -> None:
+    print("Dakar Rally...")
+    # Dakar happens in January — check for next year's edition
+    dakar_year = YEAR + 1 if datetime.now().month > 2 else YEAR
+    url = "https://www.timeout-racing.com/dakar-rally/dakar-rally-dates"
+    try:
+        html = fetch(url)
+    except URLError as e:
+        print(f"  WARN: {e}")
+        return
+
+    # Extract JSON-LD SportsEvent schema
+    m = re.search(r'"name"\s*:\s*"Dakar Rally ' + str(dakar_year) + r'".*?"startDate"\s*:\s*"(\d{4}-\d{2}-\d{2})".*?"endDate"\s*:\s*"(\d{4}-\d{2}-\d{2})"', html, re.DOTALL)
+    if not m:
+        print(f"  WARN: Dakar {dakar_year} not found in JSON-LD")
+        return
+
+    start = date.fromisoformat(m.group(1))
+    end = date.fromisoformat(m.group(2))
+
+    write_ics(
+        uid="dakar@sports",
+        summary=f"🏜️ Dakar Rally {dakar_year}",
+        start=start, end=end,
+        description=f"Dakar Rally {dakar_year}. Saudi Arabia.",
+    )
+
+
+# ── Tennis Grand Slams ────────────────────────────────────────────────────────
+
+# Dates shift by ~1 day each year; update January if needed
+GRAND_SLAMS = {
+    2026: [
+        ("🎾 Australian Open 2026",  date(2026,  1, 12), date(2026,  1, 25), "Melbourne, Australia."),
+        ("🎾 Roland Garros 2026",    date(2026,  5, 24), date(2026,  6,  7), "Paris, France."),
+        ("🎾 Wimbledon 2026",        date(2026,  6, 29), date(2026,  7, 12), "London, UK."),
+        ("🎾 US Open 2026",          date(2026,  8, 31), date(2026,  9, 13), "New York, USA."),
+    ],
+    2027: [
+        ("🎾 Australian Open 2027",  date(2027,  1, 11), date(2027,  1, 24), "Melbourne, Australia."),
+        ("🎾 Roland Garros 2027",    date(2027,  5, 23), date(2027,  6,  6), "Paris, France."),
+        ("🎾 Wimbledon 2027",        date(2027,  6, 28), date(2027,  7, 11), "London, UK."),
+        ("🎾 US Open 2027",          date(2027,  8, 30), date(2027,  9, 12), "New York, USA."),
+    ],
+}
+
+
+def sync_grand_slams() -> None:
+    print("Tennis Grand Slams...")
+    for summary, start, end, desc in GRAND_SLAMS.get(YEAR, []):
+        uid = summary.lower().replace(" ", "-").replace("é", "e") + "@sports"
+        write_ics(uid=uid, summary=summary, start=start, end=end, description=desc)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    CALENDAR_DIR.mkdir(parents=True, exist_ok=True)
+    sync_wsop()
+    sync_mlb()
+    sync_dakar()
+    sync_grand_slams()
+    print("sports-annual-sync done.")

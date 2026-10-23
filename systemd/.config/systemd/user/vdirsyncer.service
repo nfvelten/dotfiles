@@ -1,12 +1,10 @@
 [Unit]
-Description=vdirsyncer sports calendars sync
+Description=Calendários esportivos — sincronização independente por fonte
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/vdirsyncer sync
-ExecStart=/home/nfvelten/.local/bin/football-calendar-prefix
-ExecStart=/home/nfvelten/.local/bin/chess-cal-sync
-ExecStart=/home/nfvelten/.local/bin/sports-annual-sync
-ExecStart=/home/nfvelten/.local/bin/esports-cal-sync
-ExecStart=/home/nfvelten/.local/bin/nba-schedule-sync
-ExecStart=/home/nfvelten/.local/bin/mlb-schedule-sync
+ExecStart=/usr/bin/python3 %h/.config/quickshell/calendar_sync.py
+Restart=on-failure
+RestartSec=15min
+TimeoutStartSec=30min

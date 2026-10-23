@@ -122,12 +122,18 @@ set +o pipefail
         # advertising in a calendar, and it filled the detail card on every
         # match, so it is cut here rather than in the UI — the raw .ics stays
         # untouched and comes back whole on the next sync.
+        # Outlook invites carry a Teams block (join link, dial-in, options) and
+        # a LGPD disclaimer under the real text; keep only the join link.
         description: (
           .description
+          | ((capture("Ingressar: (?<u>https://[^\\s<]+)") | .u)? // "") as $teams
+          | sub("_{20,}[\\s\\S]*$"; "")
+          | sub("=== TERMO DE RESPONSABILIDADE[\\s\\S]*$"; "")
           | sub("Calendar not up to date\\?[\\s\\S]*$"; "")
           | sub("Support [^\\n]*Buy Me a Coffee[\\s\\S]*$"; "")
           | sub("^\\s+|\\s+$"; "")
-          | .[0:$maxField]
+          | (if $teams != "" then (if . == "" then "" else . + "\\n\\n" end) + "Teams: " + $teams else . end)
+          | .[0:($maxField * 10)]
         ),
         repeats: (.["repeat-symbol"] != "")
       }

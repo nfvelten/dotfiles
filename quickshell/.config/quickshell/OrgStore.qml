@@ -10,11 +10,12 @@ Scope {
     property alias tmux: tmuxStore
     property var entries: []
     property var home: ({tasks: [], taskCount: 0, recent: []})
-    property var events: []
-    property string calendarError: ""
-    property string month: Qt.formatDate(new Date(), "yyyy-MM")
-    property string loadedMonth: ""
-    readonly property bool calendarLoading: calendarProcess.running
+    CalendarStore { id: calendarStore }
+    property alias calendar: calendarStore
+    property alias events: calendarStore.events
+    property alias calendarError: calendarStore.error
+    property alias month: calendarStore.month
+    readonly property bool calendarLoading: calendarStore.loading
     property string error: ""
     property string message: ""
     property string wantedQuery: ""
@@ -62,35 +63,6 @@ Scope {
     function applyHome(data) {
         if (data.error) store.error = data.error
         else store.home = data
-    }
-    // khal takes ~5s: refresh in the background instead of on every dock open.
-    Timer { interval: 900000; running: true; repeat: true; triggeredOnStart: true; onTriggered: store.refreshCalendar() }
-    function refreshCalendar() {
-        if (calendarProcess.running) return
-        // Keep the current month's events visible while khal (~5s) refreshes them.
-        if (loadedMonth !== month) events = []
-        loadedMonth = month
-        calendarError = ""
-        var parts = month.split("-")
-        var first = new Date(Number(parts[0]), Number(parts[1]) - 1, 1)
-        var last = new Date(Number(parts[0]), Number(parts[1]), 0)
-        calendarProcess.command = ["bash", Quickshell.shellPath("almanac/khal-events"), Qt.formatDate(first, "yyyy-MM-dd"), Qt.formatDate(last, "yyyy-MM-dd")]
-        calendarProcess.running = true
-    }
-    onMonthChanged: refreshCalendar()
-    Process {
-        id: calendarProcess
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (store.loadedMonth !== store.month) return
-                try { store.events = JSON.parse(text) }
-                catch (e) { store.calendarError = "Agenda unavailable" }
-            }
-        }
-        onExited: function(code, status) {
-            if (code !== 0) store.calendarError = "Could not query khal"
-            if (store.loadedMonth !== store.month) store.refreshCalendar()
-        }
     }
     function run(action, args) {
         if (writer.running) return

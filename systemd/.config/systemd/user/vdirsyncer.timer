@@ -1,8 +1,9 @@
 [Unit]
-Description=vdirsyncer sports calendars sync — every 2 days
+Description=Calendários esportivos — atualização a cada seis horas
 
 [Timer]
-OnCalendar=*-*-1/2 03:00:00
+OnCalendar=*-*-* 00,06,12,18:00:00
+RandomizedDelaySec=5min
 Persistent=true
 
 [Install]

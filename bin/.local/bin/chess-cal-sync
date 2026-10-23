@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""
+Scrapes chess-calendar.eu for major chess tournaments and generates ICS.
+Filters by keyword list covering top-tier events only.
+"""
+
+import re
+import hashlib
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+from urllib.request import urlopen, Request
+
+KEYWORDS = [
+    "norway chess",
+    "tata steel",
+    "candidates",
+    "world championship",
+    "chess olympiad",
+    "grand chess tour",
+    "sinquefield",
+    "london chess classic",
+    "fide grand prix",
+    "superbet",
+    "altibox norway",
+    "isle of man",
+    "zagreb",
+    "stavanger",
+    "wijk aan zee",
+    "saint louis rapid",
+    "prague chess festival",
+    "freestyle chess",
+]
+
+OUTPUT_DIR = Path.home() / ".local/share/khal/calendars/sports_chess"
+HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+
+
+def fetch_month(year: int, month: int) -> str:
+    url = f"https://chess-calendar.eu/?page={year}-{month}&all_new="
+    req = Request(url, headers=HEADERS)
+    with urlopen(req, timeout=15) as r:
+        return r.read().decode("utf-8", errors="replace")
+
+
+def parse_events(html: str) -> list[dict]:
+    events = []
+    items = re.finditer(
+        r'class="calItem">(.*?)(?=class="calItem"|class="par"|$)', html, re.DOTALL
+    )
+    for item in items:
+        chunk = item.group(1)
+
+        start_m = re.search(r'class="startdate">(\d{2}\.\d{2}\.\d{4})', chunk)
+        end_m = re.search(r'class="endDate2"[^>]*>\s*(?:&nbsp;\s*)?(\d{2}\.\d{2}\.\d{4})?', chunk)
+        # Nome está no weblink div, após a flag img, antes de qualquer outra tag
+        name_m = re.search(r'flag_class2[^>]*>&nbsp;\n?([^\n<]+)', chunk)
+        city_m = re.search(r'class="city">\s*,\s*([^<]+)', chunk)
+        country_m = re.search(r'class="country">\s*,\s*([^<]+)', chunk)
+
+        if not start_m or not name_m:
+            continue
+
+        import html as htmllib
+        name = re.sub(r'<[^>]+>', '', name_m.group(1)).strip()
+        name = htmllib.unescape(name).strip()
+        name = re.sub(r'\s+', ' ', name)  # colapsa whitespace/newlines
+        if not name:
+            continue
+
+        if not any(kw in name.lower() for kw in KEYWORDS):
+            continue
+
+        start_str = start_m.group(1)
+        end_str = end_m.group(1) if end_m and end_m.group(1) else start_str
+        city = city_m.group(1).strip() if city_m else ""
+        country = country_m.group(1).strip() if country_m else ""
+
+        try:
+            start = datetime.strptime(start_str, "%d.%m.%Y")
+            end = datetime.strptime(end_str, "%d.%m.%Y") + timedelta(days=1)
+        except ValueError:
+            continue
+
+        events.append({
+            "name": name,
+            "start": start,
+            "end": end,
+            "location": f"{city}, {country}".strip(", "),
+        })
+
+    return events
+
+
+def make_uid(event: dict) -> str:
+    key = f"{event['name']}-{event['start'].date()}"
+    return hashlib.md5(key.encode()).hexdigest() + "@chess-cal"
+
+
+def to_ics_date(dt: datetime) -> str:
+    return dt.strftime("%Y%m%d")
+
+
+def write_event(event: dict, out_dir: Path) -> None:
+    uid = make_uid(event)
+    filename = out_dir / f"{uid}.ics"
+    content = "\n".join([
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//chess-cal-sync//EN",
+        "BEGIN:VEVENT",
+        f"UID:{uid}",
+        f"SUMMARY:♟️ {event['name']}",
+        f"DTSTART;VALUE=DATE:{to_ics_date(event['start'])}",
+        f"DTEND;VALUE=DATE:{to_ics_date(event['end'])}",
+        f"LOCATION:{event['location'].replace(',', '\\,')}",
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ])
+    filename.write_text(content)
+
+
+def main():
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Buscar próximos 14 meses
+    now = datetime.now()
+    months = []
+    for i in range(14):
+        m = now.month + i
+        y = now.year + (m - 1) // 12
+        m = ((m - 1) % 12) + 1
+        months.append((y, m))
+
+    seen_uids = set()
+    total = 0
+    failures = 0
+
+    for year, month in months:
+        try:
+            html = fetch_month(year, month)
+            events = parse_events(html)
+            for ev in events:
+                uid = make_uid(ev)
+                if uid not in seen_uids:
+                    write_event(ev, OUTPUT_DIR)
+                    seen_uids.add(uid)
+                    total += 1
+        except Exception as e:
+            failures += 1
+            print(f"WARN {year}-{month}: {e}", file=sys.stderr)
+
+    if failures:
+        print("chess-cal-sync: partial failure; preserving existing events", file=sys.stderr)
+        return 1
+
+    # Remover eventos que não foram encontrados nesta execução (limpeza)
+    for f in OUTPUT_DIR.glob("*@chess-cal.ics"):
+        uid_in_file = f.stem
+        if uid_in_file not in seen_uids:
+            f.unlink()
+
+    print(f"chess-cal-sync: {total} events written to {OUTPUT_DIR}")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

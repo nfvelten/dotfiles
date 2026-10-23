@@ -126,6 +126,8 @@ hl.bind("SUPER + CTRL + B", hl.dsp.exec_cmd("quickshell ipc call yerba open blue
 
 hl.bind("SUPER + CTRL + A", hl.dsp.exec_cmd("quickshell ipc call yerba open audio"))
 
+hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd("quickshell ipc call yerba open calendar"))
+
 hl.bind("SUPER + CTRL + X", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.local/bin/desktop-power"))
 
 hl.bind("SUPER + ESCAPE", hl.dsp.exec_cmd("quickshell ipc call yerba hideKeys; " .. os.getenv("HOME") .. "/.local/bin/desktop-power"))

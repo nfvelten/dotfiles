@@ -122,7 +122,7 @@ PanelWindow {
         return "Commands"
     }
     function footerHint() {
-        if (panel.route === "calendar") return "hjkl day/week    [ ] month    g today    J K event    ? keys"
+        if (panel.route === "calendar") return "hjkl day    Enter open day    j k event    f star    n remind    s reminders    ? help"
         if (panel.route === "media") return "↑ ↓ select    Enter play    Space play/pause    Tab player    / search    ? keys"
         if (panel.route === "boards") return "↑ ↓ select    Enter/o details    r refresh    Esc back"
         if (panel.route === "tmux") return "j k select    Enter/e resume in Super + C    ? keys"
@@ -151,6 +151,7 @@ PanelWindow {
     function itemKind(item) {
         if (item.tmuxWindow) return "tmux"
         if (item.orgPath) return "Org"
+        if (item.calendarEvent) return "Calendar"
         if (item.clipboardId) return item.kind
         if (item.historyKey) return item.historyApp
         if (item.passEntry) return "Password"
@@ -344,7 +345,7 @@ PanelWindow {
             ]
             return all.concat(dashboard).concat(feed.cards.map(function(c) { return [c.key, c.title] }))
         }
-        if (route === "calendar") return all.concat([["hjkl ←↓↑→", "Day / week"], ["[  ]", "Month"], ["g", "Today"], ["J  K", "Select event"]])
+        if (route === "calendar") return all.concat([["hjkl ←↓↑→", "Day / week"], ["[  ]", "Month"], ["g / w", "Today / toggle month and 7 days"], ["F", "Starred only"], ["s", "Reminders and sources"], ["Enter", "Open day (focus its events) / details"], ["j  k", "Previous / next event"], ["n / f", "Reminder / star"], ["Esc", "Back to the grid"], ["r", "Sync"]])
         if (route === "media") return all.concat([
             ["Space", "Play / pause"], ["←  →", "Previous / next"], ["s", "Shuffle"],
             ["u", "Queue"], ["r", "Recently played"], ["Click", "Seek"], ["Esc", "Back"]
@@ -473,6 +474,7 @@ PanelWindow {
             return
         }
         if (item.orgPath) { org.run("open", [item.orgPath, String(item.orgLine)]); return }
+        if (item.calendarEvent) { org.calendar.requestOpen(item.calendarEvent); return }
         if (item.orgAction) { org.run(item.orgAction); return }
         if (item.toggleTopBar) { panel.toggleTopBarRequested(); return }
         if (item.meetingAction !== undefined) { if (item.meetingAction) meeting.start(item.meetingAction); else meeting.stop(); panel.closeRequested(); return }
@@ -609,10 +611,20 @@ PanelWindow {
             var text = (item.title + " " + item.keywords).toLowerCase()
             return terms.every(function(term) { return text.indexOf(term) >= 0 })
         })
+        // Upcoming games from the loaded agenda and month; Enter opens one in the calendar.
+        var seen = {}
+        var events = org.calendar.agenda.concat(org.calendar.events).filter(function(e) {
+            var id = org.calendar.key(e), text = (e.title + " " + org.calendar.labelFor(e.calendar)).toLowerCase()
+            if (seen[id] || e.date < org.calendar.today || !terms.every(function(term) { return text.indexOf(term) >= 0 })) return false
+            return seen[id] = true
+        }).sort(function(a, b) { return (a.date + a.time).localeCompare(b.date + b.time) }).slice(0, 5).map(function(e) {
+            return {title: (org.calendar.favorite(e) ? "★ " : "") + e.title, subtitle: e.date.slice(8, 10) + "/" + e.date.slice(5, 7) + " " + (e.time || "all day") + " · " + org.calendar.labelFor(e.calendar),
+                    icon: "x-office-calendar", calendarEvent: e}
+        })
         var notes = org.entries.slice(0, 5)
         if (org.entries.length) notes.push({title: "Search all notes for “" + query.trim() + "”", subtitle: "Notes page · o", icon: "edit-find", notesQuery: query.trim()})
         var calc = calcResult && calcFor === query.trim() ? [{title: calcResult, subtitle: "= " + calcFor + " · Enter copies", icon: "accessories-calculator", calcValue: calcResult}] : []
-        return calc.concat(matches).concat(agents).concat(notes)
+        return calc.concat(matches).concat(agents).concat(events).concat(notes)
     }
 
     Connections {

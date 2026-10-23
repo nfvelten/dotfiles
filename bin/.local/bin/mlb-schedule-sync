@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+"""Refresh MLB games from the official Stats API."""
+import sys
+from sports_schedule import main
+sys.exit(main('mlb'))

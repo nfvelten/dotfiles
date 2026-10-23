@@ -224,6 +224,10 @@ ShellRoot {
     Clipboard { id: clipboardStore }
     Yerbad { id: yerbadService }
     OrgStore { id: orgStore; yerbad: yerbadService }
+    Connections {
+        target: orgStore.calendar
+        function onEventRequested(item) { menu.navigate("calendar"); root.openMenu() }
+    }
     // Spotify is visible only on the dashboard and Music page. Avoid polling
     // the Web API while the dock is closed or another route is active.
     MediaStore { id: mediaStore; yerbad: yerbadService; active: root.menuOpen && (menu.route === "main" || menu.route === "media") }
