@@ -5,7 +5,7 @@
 hl.on("hyprland.start", function()
     hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR DISPLAY HYPRLAND_INSTANCE_SIGNATURE XDG_CURRENT_DESKTOP DESKTOP_SESSION")
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_RUNTIME_DIR DISPLAY HYPRLAND_INSTANCE_SIGNATURE XDG_CURRENT_DESKTOP DESKTOP_SESSION")
-    hl.exec_cmd("systemctl --user restart hyprpolkitagent.service")
+    -- Polkit prompts come from quickshell (Polkit.qml); hyprpolkitagent stays disabled.
     hl.exec_cmd("systemctl --user start quickshell.service")
     hl.exec_cmd("systemctl --user restart desktop-wallpaper.service")
     hl.exec_cmd("hypridle")

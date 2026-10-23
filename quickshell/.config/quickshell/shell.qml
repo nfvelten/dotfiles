@@ -220,6 +220,7 @@ ShellRoot {
 
     Notifications { id: notificationService; theme: palette; paused: lockScreen.locked || root.menuOpen }
     Osd { theme: palette }
+    Polkit { theme: palette }
     Meeting { id: meetingMode; notifications: notificationService }
     Clipboard { id: clipboardStore }
     Yerbad { id: yerbadService }
