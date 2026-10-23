@@ -49,7 +49,7 @@ Scope {
     }
     function toggle() { action.command = ["python3", Quickshell.shellPath("radiola_bridge.py"), "toggle"]; action.running = true }
     function stop() { action.command = ["python3", Quickshell.shellPath("radiola_bridge.py"), "stop"]; action.running = true }
-    function open() { Quickshell.execDetached(["radiola-ui"]) }
+    function open() { Quickshell.execDetached(["uwsm", "app", "--", "radiola-ui"]) }
 
     Timer { interval: 5000; running: store.active; repeat: true; onTriggered: store.refresh() }
     Timer { interval: 250; running: store.active && store.playing; repeat: true; onTriggered: store.clock++ }

@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 import QtQuick.Controls
 
@@ -15,7 +16,7 @@ FocusScope {
     readonly property bool showButtons: buttonPreferences.showButtons
 
     function openItem(item) {
-        if (item && item.url) Qt.openUrlExternally(item.url)
+        if (item && item.url) Quickshell.execDetached(["uwsm", "app", "--", "xdg-open", item.url])
     }
     function showDetail(item) {
         if (!item) return

@@ -12,7 +12,7 @@ Card {
     title: games.length > 1 ? games.length + " games · your move" : "Your move"
     key: "g"
     function clock(ms) { var s = Math.max(0, Math.round(ms / 1000)); return Math.floor(s / 60) + ":" + ("0" + s % 60).slice(-2) }
-    function open(game) { Quickshell.execDetached(["gambito", "open", game.id]); feed.closeRequested() }
+    function open(game) { Quickshell.execDetached(["uwsm", "app", "--", "gambito", "open", game.id]); feed.closeRequested() }
     function handleKey(text, key) {
         if (text === "g" && games.length) { open(games[0]); return true }
         return false

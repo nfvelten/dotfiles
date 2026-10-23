@@ -435,7 +435,7 @@ PanelWindow {
             var tmuxItem = contextItem
             if (item.tmuxAction === "resume") { contextItem = null; morphToTmux(tmuxItem); return }
             if (item.tmuxAction === "directory" && tmuxItem.panePath) {
-                Quickshell.execDetached({command: ["ghostty", "-e", "yazi", tmuxItem.panePath]})
+                Quickshell.execDetached({command: ["uwsm", "app", "--", "ghostty", "-e", "yazi", tmuxItem.panePath]})
                 panel.closeRequested(); return
             }
             if (item.tmuxAction === "filter") { contextItem = null; route = "tmux"; query = tmuxItem.sessionName; selected = 0; return }
@@ -453,7 +453,7 @@ PanelWindow {
         if (item.passAction) {
             var passItem = contextItem
             contextItem = null; selected = 0
-            if (item.passAction === "edit") { Quickshell.execDetached(["ghostty", "-e", "pass", "edit", passItem.passEntry]); panel.closeRequested() }
+            if (item.passAction === "edit") { Quickshell.execDetached(["uwsm", "app", "--", "ghostty", "-e", "pass", "edit", passItem.passEntry]); panel.closeRequested() }
             else copyPass(passItem.passEntry, item.passAction)
             return
         }
@@ -485,6 +485,8 @@ PanelWindow {
             var command = Array.from(entry.command)
             if (!command.length) return
             if (entry.runInTerminal) command = ["ghostty", "-e"].concat(command)
+            // Own scope per app: restarting quickshell.service must not take launched apps (or an AppImage's mount) with it.
+            command = ["uwsm", "app", "--"].concat(command)
             Quickshell.execDetached({command: command, workingDirectory: entry.workingDirectory})
             panel.closeRequested()
             return
@@ -507,7 +509,7 @@ PanelWindow {
             query = ""; selected = 0; return
         }
         if (item.confirm) { pending = item; query = ""; selected = 0; return }
-        Quickshell.execDetached(["bash", "-lc", item.command])
+        Quickshell.execDetached(["uwsm", "app", "--", "bash", "-lc", item.command])
         panel.closeRequested()
     }
 
