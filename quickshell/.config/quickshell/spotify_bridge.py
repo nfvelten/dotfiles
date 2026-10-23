@@ -42,7 +42,7 @@ def token_file():
 def token():
     path = token_file()
     if not path:
-        raise ValueError("Spotify player não está autenticado")
+        raise ValueError("spotify_player is not authenticated")
     data = json.loads(path.read_text())
     expires = data.get("expires_at", "")
     if expires:
@@ -80,13 +80,13 @@ def api(path, params):
                     limit_file.write_text(json.dumps({"until": time.time() + int(retry)}))
                 except (TypeError, ValueError, OSError):
                     pass
-                raise ValueError(f"Spotify API está limitando este cliente; aguarde {retry}s")
+                raise ValueError(f"Spotify API is rate-limiting this client; wait {retry}s")
             if error.code == 403:
-                raise ValueError("Spotify recusou esta operação (HTTP 403); autentique novamente no spotify_player")
+                raise ValueError("Spotify refused this operation (HTTP 403); re-authenticate spotify_player")
             raise ValueError("Spotify API respondeu HTTP " + str(error.code))
         except urllib.error.URLError as error:
             if attempt == 2:
-                raise ValueError("Spotify indisponível: falha de rede/DNS")
+                raise ValueError("Spotify unavailable: network/DNS failure")
             time.sleep(1 + attempt)
 
 def search(query):
@@ -114,7 +114,7 @@ def playlists():
             if current_user and owner_id != current_user:
                 continue
             count = item.get("items", item.get("tracks", {})).get("total", 0)
-            result.append(dict(id=item["id"], title=item["name"], subtitle=f"Playlist · {count} faixas", art=(item.get("images") or [{}])[0].get("url", ""), kind="playlist", owned=True))
+            result.append(dict(id=item["id"], title=item["name"], subtitle=f"Playlist · {count} tracks", art=(item.get("images") or [{}])[0].get("url", ""), kind="playlist", owned=True))
         if not data.get("next") or not data.get("items"):
             break
         offset += len(data["items"])
@@ -136,7 +136,7 @@ def playlist_tracks(playlist_id):
             offset += len(rows)
     except ValueError as error:
         if "HTTP 403" in str(error):
-            return {"error": "Spotify não permite ler as faixas desta playlist com o token atual; tente uma playlist própria ou reautentique."}
+            return {"error": "Spotify won't list this playlist's tracks with the current token; try one of your own playlists or re-authenticate."}
         raise
     return result
 
@@ -154,7 +154,7 @@ def local_play(command):
                 break
     local =subprocess.run(command, capture_output=True, text=True, timeout=15)
     if local.returncode != 0:
-        raise ValueError(local.stderr.strip() or "Não foi possível iniciar a faixa no daemon local")
+        raise ValueError(local.stderr.strip() or "Could not start the track on the local daemon")
 
 def play(track_id):
     body = json.dumps({"uris": [f"spotify:track:{track_id}"]}).encode()
@@ -171,7 +171,7 @@ def play(track_id):
             local_play(["spotify_player", "playback", "start", "track", "--id", track_id])
             return {"ok": True, "local": True}
         if error.code == 403:
-            raise ValueError("Spotify não permitiu controlar a reprodução; autentique novamente")
+            raise ValueError("Spotify refused playback control; re-authenticate")
         raise ValueError("Spotify playback respondeu HTTP " + str(error.code))
     return {"ok": True}
 
@@ -194,7 +194,7 @@ def play_playlist(playlist_id, position):
             local_play(["spotify_player", "playback", "start", "context", "--id", playlist_id, "playlist"])
             return {"ok": True, "local": True}
         if error.code == 403:
-            raise ValueError("Spotify não permitiu controlar a reprodução; autentique novamente")
+            raise ValueError("Spotify refused playback control; re-authenticate")
         raise ValueError("Spotify playback respondeu HTTP " + str(error.code))
     return {"ok": True}
 

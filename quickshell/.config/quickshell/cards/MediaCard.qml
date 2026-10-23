@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Services.Mpris
+import ".."
 
 // Whatever is playing, or paused mid-track. Spotify uses the richer bridge data;
 // any other MPRIS player (e.g. a browser video) shows its own metadata.
@@ -64,6 +65,7 @@ Card {
                         Text { Layout.fillWidth: true; text: card.trackTitle || "Nothing playing"; color: card.theme.foreground; font.pixelSize: 14; textFormat: Text.PlainText; elide: Text.ElideRight }
                     }
                     Text { Layout.fillWidth: true; text: card.trackInfo; color: card.theme.foreground; opacity: 0.6; font.pixelSize: 11; textFormat: Text.PlainText; elide: Text.ElideRight }
+                    Visualizer { Layout.fillWidth: true; theme: card.theme; running: card.playing }
                     RowLayout {
                         Layout.fillWidth: true; spacing: 7
                         Text { text: card.media.formatTime(card.position()); color: card.theme.foreground; opacity: 0.5; font.pixelSize: 10; font.family: "monospace" }

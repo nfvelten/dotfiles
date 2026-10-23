@@ -200,12 +200,6 @@ FocusScope {
     ColumnLayout {
         anchors.fill: parent
         spacing: 16
-        RowLayout {
-            Layout.fillWidth: true
-            Text { text: "Media"; color: theme.foreground; font.pixelSize: 20 }
-            Item { Layout.fillWidth: true }
-            Text { text: (player ? player.identity : "No player") + (view.players.filter(function(p) { return p.trackTitle }).length > 1 ? "  ·  Tab switch" : ""); color: theme.foreground; opacity: 0.55; font.pixelSize: 12 }
-        }
         Rectangle {
             visible: view.searchVisible
             Layout.fillWidth: true; height: 42; radius: 6
@@ -256,19 +250,20 @@ FocusScope {
                 }
             }
             Rectangle {
-                Layout.preferredWidth: 270; Layout.fillWidth: !view.isSpotify; Layout.fillHeight: true; radius: 10
+                Layout.preferredWidth: Math.round(view.width * 0.45); Layout.fillWidth: !view.isSpotify; Layout.fillHeight: true; radius: 10
                 color: Qt.alpha(theme.foreground, 0.035); border.color: Qt.alpha(theme.foreground, 0.12)
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 14; spacing: 7
-                    Text { text: "Now playing"; color: theme.foreground; opacity: 0.55; font.pixelSize: 11 }
+                    // Player name only matters when there is more than one to Tab between.
+                    Text { text: view.players.filter(function(p) { return p.trackTitle }).length > 1 ? (player ? player.identity : "No player") + "  ·  Tab switch" : "Now playing"; color: theme.foreground; opacity: 0.55; font.pixelSize: 11 }
                     Image {
                         visible: !!view.nowArt
                         source: view.nowArt
                         sourceSize.width: 420; sourceSize.height: 420
-                        Layout.fillWidth: true; Layout.preferredHeight: view.searchVisible ? 170 : (view.showButtons ? 215 : 230)
+                        Layout.fillWidth: true; Layout.fillHeight: true
                         fillMode: Image.PreserveAspectFit; asynchronous: true
                     }
-                    Rectangle { visible: !view.nowArt; Layout.fillWidth: true; Layout.preferredHeight: view.searchVisible ? 170 : (view.showButtons ? 215 : 230); color: Qt.alpha(theme.foreground, 0.06); radius: 6
+                    Rectangle { visible: !view.nowArt; Layout.fillWidth: true; Layout.fillHeight: true; color: Qt.alpha(theme.foreground, 0.06); radius: 6
                         Text { anchors.centerIn: parent; text: "♪"; color: theme.foreground; opacity: 0.35; font.pixelSize: 42 }
                     }
                     RowLayout {
@@ -281,6 +276,7 @@ FocusScope {
                     }
                     Text { Layout.fillWidth: true; text: view.nowTitle || "Nothing playing"; textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; font.pixelSize: 16 }
                     Text { Layout.fillWidth: true; text: view.nowInfo || (view.isSpotify ? "Open a playlist to start" : ""); textFormat: Text.PlainText; elide: Text.ElideRight; color: theme.foreground; opacity: 0.65; font.pixelSize: 12 }
+                    Visualizer { Layout.fillWidth: true; theme: view.theme; running: view.nowPlaying }
                     RowLayout {
                         Layout.fillWidth: true; spacing: 8
                         Text { text: view.media.formatTime(view.nowPosition()); color: theme.foreground; opacity: 0.55; font.pixelSize: 10; font.family: "monospace" }
@@ -295,7 +291,6 @@ FocusScope {
                         }
                         Text { text: view.nowDuration > 0 ? view.media.formatTime(view.nowDuration) : "live"; color: theme.foreground; opacity: 0.55; font.pixelSize: 10; font.family: "monospace" }
                     }
-                    Item { Layout.fillHeight: true }
                     GridLayout {
                         Layout.fillWidth: true; columns: 2; columnSpacing: 6; rowSpacing: 6
                         DashButton { Layout.fillWidth: true; theme: view.theme; text: "Previous"; hint: "←"; enabled: !!view.player && (view.player.canGoPrevious || view.player.canSeek); focusPolicy: Qt.NoFocus; onClicked: view.skip(-1) }
