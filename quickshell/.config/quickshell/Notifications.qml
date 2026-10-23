@@ -99,7 +99,7 @@ Scope {
         actionsSupported: true
         bodySupported: true
         bodyMarkupSupported: false
-        imageSupported: false
+        imageSupported: true
         onNotification: function(n) {
             n.tracked = true
             service.record(n)
@@ -152,7 +152,7 @@ Scope {
                     title: modelData.summary
                     body: modelData.body
                     app: modelData.appName
-                    icon: modelData.appIcon
+                    icon: modelData.image || modelData.appIcon
                     critical: modelData.urgency === NotificationUrgency.Critical
                     actions: modelData.actions
                     keyHint: modelData === service.keyTarget ? "Super ⇧ ." : ""

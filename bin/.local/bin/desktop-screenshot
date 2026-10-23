@@ -19,7 +19,6 @@ file="$output_dir/screenshot-$(date +%Y-%m-%d_%H-%M-%S).png"
 if [[ $mode == full ]]; then
     grim "$file"
 else
-    notify-send 'Screenshot picker' 'Select a window or drag a region'
     active_workspace=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | .activeWorkspace.id')
     rects=$(
         {
@@ -59,4 +58,5 @@ else
     wl-copy --type image/png < "$file"
 fi
 
-notify-send 'Screenshot ready' "$(basename "$file")" >/dev/null 2>&1 || true
+# Transient: a short confirmation that never lands in the notification history.
+notify-send -t 2000 -h boolean:transient:true 'Screenshot ready' "$(basename "$file")" >/dev/null 2>&1 || true
